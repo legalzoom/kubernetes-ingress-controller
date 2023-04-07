@@ -386,11 +386,12 @@ func TestFromIngressV1(t *testing.T) {
 
 	t.Run("CombinedRoutes=off", func(t *testing.T) {
 		t.Run("no ingress returns empty info", func(t *testing.T) {
-			store, err := store.NewFakeStore(store.FakeObjects{
+			s, err := store.NewFakeStore(store.FakeObjects{
 				IngressesV1: []*netv1.Ingress{},
 			})
+
 			require.NoError(t, err)
-			p := mustNewParser(t, store)
+			p := mustNewParser(t, s)
 
 			parsedInfo := p.ingressRulesFromIngressV1()
 			assert.Equal(t, ingressRules{
@@ -400,13 +401,13 @@ func TestFromIngressV1(t *testing.T) {
 			}, parsedInfo)
 		})
 		t.Run("simple ingress rule is parsed", func(t *testing.T) {
-			store, err := store.NewFakeStore(store.FakeObjects{
+			s, err := store.NewFakeStore(store.FakeObjects{
 				IngressesV1: []*netv1.Ingress{
 					ingressList[0],
 				},
 			})
 			require.NoError(t, err)
-			p := mustNewParser(t, store)
+			p := mustNewParser(t, s)
 
 			parsedInfo := p.ingressRulesFromIngressV1()
 			assert.Len(t, parsedInfo.ServiceNameToServices, 1)

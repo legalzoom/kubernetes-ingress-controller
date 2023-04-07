@@ -1,16 +1,20 @@
 package store
 
 import (
+	"bytes"
 	"reflect"
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	netv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/tools/cache"
 	knative "knative.dev/networking/pkg/apis/networking/v1alpha1"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/annotations"
 	configurationv1 "github.com/kong/kubernetes-ingress-controller/v2/pkg/apis/configuration/v1"
@@ -226,4 +230,68 @@ func NewFakeStore(
 		logger:                logrus.New(),
 	}
 	return s, nil
+}
+
+func DumpAsYaml(objects FakeObjects) ([]byte, error) {
+	out := &bytes.Buffer{}
+	appendObj := func(obj runtime.Object) error {
+		b, err := dumpObj(obj)
+		if err != nil {
+			return err
+		}
+		out.Write(b)
+		out.WriteString("---\n")
+		return nil
+	}
+
+	for _, obj := range objects.Secrets {
+		obj.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+		if err := appendObj(obj); err != nil {
+			return nil, err
+		}
+	}
+	for _, obj := range objects.KongPlugins {
+		obj.GetObjectKind().SetGroupVersionKind(configurationv1.SchemeGroupVersion.WithKind("KongPlugin"))
+		if err := appendObj(obj); err != nil {
+			return nil, err
+		}
+	}
+	for _, obj := range objects.KongClusterPlugins {
+		obj.GetObjectKind().SetGroupVersionKind(configurationv1.SchemeGroupVersion.WithKind("KongClusterPlugin"))
+		if err := appendObj(obj); err != nil {
+			return nil, err
+		}
+	}
+	for _, obj := range objects.IngressesV1 {
+		obj.GetObjectKind().SetGroupVersionKind(netv1.SchemeGroupVersion.WithKind("Ingress"))
+		if err := appendObj(obj); err != nil {
+			return nil, err
+		}
+	}
+	for _, obj := range objects.Services {
+		obj.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
+		if err := appendObj(obj); err != nil {
+			return nil, err
+		}
+	}
+	for _, obj := range objects.EndpointSlices {
+		obj.GetObjectKind().SetGroupVersionKind(discoveryv1.SchemeGroupVersion.WithKind("EndpointSlice"))
+		if err := appendObj(obj); err != nil {
+			return nil, err
+		}
+	}
+
+	return out.Bytes(), nil
+}
+
+func dumpObj(obj runtime.Object) ([]byte, error) {
+	buff := bytes.Buffer{}
+	printer := printers.JSONPrinter{}
+
+	err := printer.PrintObj(obj, &buff)
+	if err != nil {
+		return nil, err
+	}
+
+	return yaml.JSONToYAML(buff.Bytes())
 }

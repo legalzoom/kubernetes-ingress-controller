@@ -1,0 +1,50 @@
+_format_version: "3.0"
+services:
+- connect_timeout: 60000
+  host: service-1.foo-namespace.implicitPort.svc
+  id: 83795370-9baa-5dd5-b415-b76f201dc8e4
+  name: foo-namespace.foo.service-1.implicitPort
+  path: /
+  port: 80
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - hosts:
+    - example.com
+    https_redirect_status_code: 426
+    id: 4be69fc4-1bc8-5a5d-826b-bbc54e05b816
+    name: foo-namespace.foo.service-1.example.com.implicitPort
+    path_handling: v0
+    paths:
+    - /
+    preserve_host: true
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: false
+    tags:
+    - k8s-name:foo
+    - k8s-namespace:foo-namespace
+    - k8s-kind:Ingress
+    - k8s-group:networking.k8s.io
+    - k8s-version:v1
+  tags:
+  - k8s-name:service-1
+  - k8s-namespace:foo-namespace
+  - k8s-kind:Service
+  - k8s-version:v1
+  write_timeout: 60000
+upstreams:
+- algorithm: round-robin
+  name: service-1.foo-namespace.implicitPort.svc
+  tags:
+  - k8s-name:service-1
+  - k8s-namespace:foo-namespace
+  - k8s-kind:Service
+  - k8s-version:v1
+  targets:
+  - target: 2.2.2.2:9999

@@ -4462,7 +4462,6 @@ func TestGetEndpoints(t *testing.T) {
 								NodeName:  lo.ToPtr("dummy"),
 							},
 						},
-
 						Ports: []discoveryv1.EndpointPort{
 							builder.NewEndpointPort(80).WithName("port-1").WithProtocol(corev1.ProtocolTCP).Build(),
 							builder.NewEndpointPort(80).WithName("port-1").WithProtocol(corev1.ProtocolTCP).Build(),

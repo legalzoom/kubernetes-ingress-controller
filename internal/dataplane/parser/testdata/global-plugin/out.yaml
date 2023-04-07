@@ -1,0 +1,12 @@
+_format_version: "3.0"
+plugins:
+- config:
+    foo1: bar1
+  name: basic-auth
+  protocols:
+  - http
+  tags:
+  - k8s-name:bar-plugin
+  - k8s-kind:KongClusterPlugin
+  - k8s-group:configuration.konghq.com
+  - k8s-version:v1

@@ -338,6 +338,10 @@ test.unit:
 test.unit.pretty:
 	@$(MAKE) GOTESTSUM_FORMAT=pkgname _test.unit
 
+.PHONY: test.update.golden
+test.update.golden:
+	@$(MAKE) _test.unit UPDATE_GOLDEN=true
+
 .PHONY: _check.container.environment
 _check.container.environment:
 	@./scripts/check-container-environment.sh

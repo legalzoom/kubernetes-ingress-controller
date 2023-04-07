@@ -1,0 +1,50 @@
+_format_version: "3.0"
+services:
+- connect_timeout: 60000
+  host: service-0.foo-namespace.port3.svc
+  id: c2d2d4ab-b46b-5e63-b67b-599bcab683f0
+  name: foo-namespace.foo.service-0.port3
+  path: /
+  port: 80
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - hosts:
+    - example.com
+    https_redirect_status_code: 426
+    id: e8e18f34-ac5d-58cd-9b6c-6dca8e096de8
+    name: foo-namespace.foo.service-0.example.com.port3
+    path_handling: v0
+    paths:
+    - /
+    preserve_host: true
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: false
+    tags:
+    - k8s-name:foo
+    - k8s-namespace:foo-namespace
+    - k8s-kind:Ingress
+    - k8s-group:networking.k8s.io
+    - k8s-version:v1
+  tags:
+  - k8s-name:service-0
+  - k8s-namespace:foo-namespace
+  - k8s-kind:Service
+  - k8s-version:v1
+  write_timeout: 60000
+upstreams:
+- algorithm: round-robin
+  name: service-0.foo-namespace.port3.svc
+  tags:
+  - k8s-name:service-0
+  - k8s-namespace:foo-namespace
+  - k8s-kind:Service
+  - k8s-version:v1
+  targets:
+  - target: 1.1.1.1:333

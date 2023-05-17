@@ -53,7 +53,7 @@ jobs:
       kic-image: ${{ format('{0}:{1}', github.event.inputs.e2e-controller-image-repo, github.event.inputs.e2e-controller-image-tag) }}
       kong-image: ${{ format('{0}:{1}', github.event.inputs.kong-image-repo, github.event.inputs.kong-image-tag) }}
       load-local-image: false
-      run-gke: true
+      run-gke: false
       run-istio: true
       all-supported-k8s-versions: true
 

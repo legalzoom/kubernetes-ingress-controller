@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -18,9 +19,12 @@ import (
 	netv1 "k8s.io/api/networking/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/cli-runtime/pkg/printers"
 	knative "knative.dev/networking/pkg/apis/networking/v1alpha1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/annotations"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane/kongstate"
@@ -260,45 +264,17 @@ dZFcvZcT/p717K3hlFVdjGnKIgKcG7aYji/XRR87HKnc+cJMCw==
 -----END CERTIFICATE-----`
 )
 
-func TestGlobalPlugin(t *testing.T) {
-	assert := assert.New(t)
-	t.Run("global plugins are processed correctly", func(t *testing.T) {
-		store, err := store.NewFakeStore(store.FakeObjects{
-			KongClusterPlugins: []*configurationv1.KongClusterPlugin{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bar-plugin",
-						Labels: map[string]string{
-							"global": "true",
-						},
-						Annotations: map[string]string{
-							annotations.IngressClassKey: annotations.DefaultIngressClass,
-						},
-					},
-					Protocols:  configurationv1.StringsToKongProtocols([]string{"http"}),
-					PluginName: "basic-auth",
-					Config: apiextensionsv1.JSON{
-						Raw: []byte(`{"foo1": "bar1"}`),
-					},
-				},
-			},
-		})
-		require.NoError(t, err)
-		p := mustNewParser(t, store)
-		result := p.BuildKongConfig()
-		require.Empty(t, result.TranslationFailures)
-		state := result.KongState
-		require.NotNil(t, state)
-		assert.Equal(1, len(state.Plugins),
-			"expected one plugin to be rendered")
+func dumpObj(t *testing.T, obj runtime.Object) {
+	buff := bytes.Buffer{}
+	printer := printers.JSONPrinter{}
 
-		sort.SliceStable(state.Plugins, func(i, j int) bool {
-			return strings.Compare(*state.Plugins[i].Name, *state.Plugins[j].Name) > 0
-		})
+	err := printer.PrintObj(obj, &buff)
+	require.NoError(t, err)
 
-		assert.Equal("basic-auth", *state.Plugins[0].Name)
-		assert.Equal(kong.Configuration{"foo1": "bar1"}, state.Plugins[0].Config)
-	})
+	y, err := yaml.JSONToYAML(buff.Bytes())
+	require.NoError(t, err)
+
+	t.Logf("\n%s", string(y))
 }
 
 func TestSecretConfigurationPlugin(t *testing.T) {
@@ -317,6 +293,9 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 		},
 		IngressesV1: []*netv1.Ingress{
 			{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "Ingress",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "default",
@@ -386,119 +365,6 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 			},
 		},
 	}
-	t.Run("plugins with secret configuration are processed correctly",
-		func(t *testing.T) {
-			objects := stock
-			objects.KongPlugins = []*configurationv1.KongPlugin{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo-plugin",
-						Namespace: "default",
-					},
-					PluginName: "jwt",
-					ConfigFrom: &configurationv1.ConfigSource{
-						SecretValue: configurationv1.SecretValueFromSource{
-							Key:    "jwt-config",
-							Secret: "conf-secret",
-						},
-					},
-				},
-			}
-			objects.KongClusterPlugins = []*configurationv1.KongClusterPlugin{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "global-bar-plugin",
-						Labels: map[string]string{
-							"global": "true",
-						},
-						Annotations: map[string]string{
-							annotations.IngressClassKey: annotations.DefaultIngressClass,
-						},
-					},
-					Protocols:  configurationv1.StringsToKongProtocols([]string{"http"}),
-					PluginName: "basic-auth",
-					ConfigFrom: &configurationv1.NamespacedConfigSource{
-						SecretValue: configurationv1.NamespacedSecretValueFromSource{
-							Key:       "basic-auth-config",
-							Secret:    "conf-secret",
-							Namespace: "default",
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "global-broken-bar-plugin",
-						Labels: map[string]string{
-							"global": "true",
-						},
-						Annotations: map[string]string{
-							// explicitly none, this should not get rendered
-						},
-					},
-					Protocols:  configurationv1.StringsToKongProtocols([]string{"http"}),
-					PluginName: "basic-auth",
-					ConfigFrom: &configurationv1.NamespacedConfigSource{
-						SecretValue: configurationv1.NamespacedSecretValueFromSource{
-							Key:       "basic-auth-config",
-							Secret:    "conf-secret",
-							Namespace: "default",
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bar-plugin",
-					},
-					Protocols:  configurationv1.StringsToKongProtocols([]string{"http"}),
-					PluginName: "basic-auth",
-					ConfigFrom: &configurationv1.NamespacedConfigSource{
-						SecretValue: configurationv1.NamespacedSecretValueFromSource{
-							Key:       "basic-auth-config",
-							Secret:    "conf-secret",
-							Namespace: "default",
-						},
-					},
-				},
-			}
-			objects.Secrets = []*corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						UID:       k8stypes.UID("7428fb98-180b-4702-a91f-61351a33c6e4"),
-						Name:      "conf-secret",
-						Namespace: "default",
-					},
-					Data: map[string][]byte{
-						"jwt-config":        []byte(jwtPluginConfig),
-						"basic-auth-config": []byte(basicAuthPluginConfig),
-					},
-				},
-			}
-			store, err := store.NewFakeStore(objects)
-			require.NoError(t, err)
-			p := mustNewParser(t, store)
-			result := p.BuildKongConfig()
-			require.Empty(t, result.TranslationFailures)
-			require.NoError(t, err)
-			state := result.KongState
-			require.NotNil(t, state)
-			assert.Equal(3, len(state.Plugins),
-				"expected three plugins to be rendered")
-
-			sort.SliceStable(state.Plugins, func(i, j int) bool {
-				return strings.Compare(*state.Plugins[i].Name,
-					*state.Plugins[j].Name) > 0
-			})
-			assert.Equal("jwt", *state.Plugins[0].Name)
-			assert.Equal(kong.Configuration{"run_on_preflight": false},
-				state.Plugins[0].Config)
-
-			assert.Equal("basic-auth", *state.Plugins[1].Name)
-			assert.Equal(kong.Configuration{"hide_credentials": true},
-				state.Plugins[2].Config)
-			assert.Equal("basic-auth", *state.Plugins[2].Name)
-			assert.Equal(kong.Configuration{"hide_credentials": true},
-				state.Plugins[2].Config)
-		})
 
 	t.Run("plugins with missing secrets or keys are not constructed",
 		func(t *testing.T) {
@@ -580,6 +446,7 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 					},
 				},
 			}
+
 			store, err := store.NewFakeStore(objects)
 			require.NoError(t, err)
 			p := mustNewParser(t, store)
@@ -684,6 +551,28 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 					},
 				},
 			}
+
+			for _, obj := range objects.Secrets {
+				obj.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+				dumpObj(t, obj)
+			}
+			for _, obj := range objects.KongPlugins {
+				obj.GetObjectKind().SetGroupVersionKind(configurationv1.SchemeGroupVersion.WithKind("KongPlugin"))
+				dumpObj(t, obj)
+			}
+			for _, obj := range objects.KongClusterPlugins {
+				obj.GetObjectKind().SetGroupVersionKind(configurationv1.SchemeGroupVersion.WithKind("KongClusterPlugin"))
+				dumpObj(t, obj)
+			}
+			for _, obj := range objects.IngressesV1 {
+				obj.GetObjectKind().SetGroupVersionKind(netv1.SchemeGroupVersion.WithKind("Ingress"))
+				dumpObj(t, obj)
+			}
+			for _, obj := range objects.Services {
+				obj.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
+				dumpObj(t, obj)
+			}
+
 			store, err := store.NewFakeStore(objects)
 			require.NoError(t, err)
 			p := mustNewParser(t, store)

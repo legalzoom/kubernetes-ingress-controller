@@ -1,0 +1,118 @@
+_format_version: "3.0"
+plugins:
+- config:
+    run_on_preflight: false
+  name: jwt
+  route: default.foo.foo-svc.example.com.80
+  tags:
+  - k8s-name:foo-plugin
+  - k8s-namespace:default
+  - k8s-kind:KongPlugin
+  - k8s-group:configuration.konghq.com
+  - k8s-version:v1
+- config:
+    hide_credentials: true
+  name: basic-auth
+  protocols:
+  - http
+  route: default.bar.foo-svc.example.net.80
+  tags:
+  - k8s-name:bar-plugin
+  - k8s-kind:KongClusterPlugin
+  - k8s-group:configuration.konghq.com
+  - k8s-version:v1
+- config:
+    hide_credentials: true
+  name: basic-auth
+  protocols:
+  - http
+  tags:
+  - k8s-name:global-bar-plugin
+  - k8s-kind:KongClusterPlugin
+  - k8s-group:configuration.konghq.com
+  - k8s-version:v1
+services:
+- connect_timeout: 60000
+  host: foo-svc.default.80.svc
+  id: 7264a951-f83c-5727-8bb4-c6c6a8cf987b
+  name: default.foo.foo-svc.80
+  path: /
+  port: 80
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - hosts:
+    - example.com
+    https_redirect_status_code: 426
+    id: 99296cc1-ab30-59f8-b204-7b1a45e64cac
+    name: default.foo.foo-svc.example.com.80
+    path_handling: v0
+    paths:
+    - /
+    preserve_host: true
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: false
+    tags:
+    - k8s-name:foo
+    - k8s-namespace:default
+    - k8s-kind:Ingress
+    - k8s-group:networking.k8s.io
+    - k8s-version:v1
+  tags:
+  - k8s-name:foo-svc
+  - k8s-namespace:default
+  - k8s-kind:Service
+  - k8s-version:v1
+  write_timeout: 60000
+- connect_timeout: 60000
+  host: foo-svc.default.80.svc
+  id: cb4a416a-7dd4-5f7f-a7dc-9452a0f6e588
+  name: default.bar.foo-svc.80
+  path: /
+  port: 80
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - hosts:
+    - example.net
+    https_redirect_status_code: 426
+    id: 6c70ad25-a120-551d-80f5-2f0083635436
+    name: default.bar.foo-svc.example.net.80
+    path_handling: v0
+    paths:
+    - /
+    preserve_host: true
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: false
+    tags:
+    - k8s-name:bar
+    - k8s-namespace:default
+    - k8s-kind:Ingress
+    - k8s-group:networking.k8s.io
+    - k8s-version:v1
+  tags:
+  - k8s-name:foo-svc
+  - k8s-namespace:default
+  - k8s-kind:Service
+  - k8s-version:v1
+  write_timeout: 60000
+upstreams:
+- algorithm: round-robin
+  name: foo-svc.default.80.svc
+  tags:
+  - k8s-name:foo-svc
+  - k8s-namespace:default
+  - k8s-kind:Service
+  - k8s-version:v1

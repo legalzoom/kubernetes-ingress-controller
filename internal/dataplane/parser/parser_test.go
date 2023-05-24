@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -19,12 +18,9 @@ import (
 	netv1 "k8s.io/api/networking/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/cli-runtime/pkg/printers"
 	knative "knative.dev/networking/pkg/apis/networking/v1alpha1"
-	"sigs.k8s.io/yaml"
 
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/annotations"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane/kongstate"
@@ -264,19 +260,6 @@ dZFcvZcT/p717K3hlFVdjGnKIgKcG7aYji/XRR87HKnc+cJMCw==
 -----END CERTIFICATE-----`
 )
 
-func dumpObj(t *testing.T, obj runtime.Object) {
-	buff := bytes.Buffer{}
-	printer := printers.JSONPrinter{}
-
-	err := printer.PrintObj(obj, &buff)
-	require.NoError(t, err)
-
-	y, err := yaml.JSONToYAML(buff.Bytes())
-	require.NoError(t, err)
-
-	t.Logf("\n%s", string(y))
-}
-
 func TestSecretConfigurationPlugin(t *testing.T) {
 	jwtPluginConfig := `{"run_on_preflight": false}`  // JSON
 	basicAuthPluginConfig := "hide_credentials: true" // YAML
@@ -365,99 +348,6 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 			},
 		},
 	}
-
-	t.Run("plugins with missing secrets or keys are not constructed",
-		func(t *testing.T) {
-			objects := stock
-			objects.KongPlugins = []*configurationv1.KongPlugin{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "global-foo-plugin",
-						Namespace: "default",
-						Labels: map[string]string{
-							"global": "true",
-						},
-					},
-					PluginName: "jwt",
-					ConfigFrom: &configurationv1.ConfigSource{
-						SecretValue: configurationv1.SecretValueFromSource{
-							Key:    "missing-key",
-							Secret: "conf-secret",
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo-plugin",
-						Namespace: "default",
-					},
-					PluginName: "jwt",
-					ConfigFrom: &configurationv1.ConfigSource{
-						SecretValue: configurationv1.SecretValueFromSource{
-							Key:    "missing-key",
-							Secret: "conf-secret",
-						},
-					},
-				},
-			}
-			objects.KongClusterPlugins = []*configurationv1.KongClusterPlugin{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "global-bar-plugin",
-						Labels: map[string]string{
-							"global": "true",
-						},
-					},
-					Protocols:  configurationv1.StringsToKongProtocols([]string{"http"}),
-					PluginName: "basic-auth",
-					ConfigFrom: &configurationv1.NamespacedConfigSource{
-						SecretValue: configurationv1.NamespacedSecretValueFromSource{
-							Key:       "basic-auth-config",
-							Secret:    "missing-secret",
-							Namespace: "default",
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bar-plugin",
-					},
-					Protocols:  configurationv1.StringsToKongProtocols([]string{"http"}),
-					PluginName: "basic-auth",
-					ConfigFrom: &configurationv1.NamespacedConfigSource{
-						SecretValue: configurationv1.NamespacedSecretValueFromSource{
-							Key:       "basic-auth-config",
-							Secret:    "missing-secret",
-							Namespace: "default",
-						},
-					},
-				},
-			}
-			objects.Secrets = []*corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						UID:       k8stypes.UID("7428fb98-180b-4702-a91f-61351a33c6e4"),
-						Name:      "conf-secret",
-						Namespace: "default",
-					},
-					Data: map[string][]byte{
-						"jwt-config":        []byte(jwtPluginConfig),
-						"basic-auth-config": []byte(basicAuthPluginConfig),
-					},
-				},
-			}
-
-			store, err := store.NewFakeStore(objects)
-			require.NoError(t, err)
-			p := mustNewParser(t, store)
-			result := p.BuildKongConfig()
-			require.Empty(t, result.TranslationFailures)
-			require.NoError(t, err)
-			state := result.KongState
-			require.NotNil(t, state)
-			assert.Equal(0, len(state.Plugins),
-				"expected no plugins to be rendered")
-		})
 
 	t.Run("plugins with both config and configFrom are not constructed",
 		func(t *testing.T) {
@@ -550,27 +440,6 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 						"basic-auth-config": []byte(basicAuthPluginConfig),
 					},
 				},
-			}
-
-			for _, obj := range objects.Secrets {
-				obj.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-				dumpObj(t, obj)
-			}
-			for _, obj := range objects.KongPlugins {
-				obj.GetObjectKind().SetGroupVersionKind(configurationv1.SchemeGroupVersion.WithKind("KongPlugin"))
-				dumpObj(t, obj)
-			}
-			for _, obj := range objects.KongClusterPlugins {
-				obj.GetObjectKind().SetGroupVersionKind(configurationv1.SchemeGroupVersion.WithKind("KongClusterPlugin"))
-				dumpObj(t, obj)
-			}
-			for _, obj := range objects.IngressesV1 {
-				obj.GetObjectKind().SetGroupVersionKind(netv1.SchemeGroupVersion.WithKind("Ingress"))
-				dumpObj(t, obj)
-			}
-			for _, obj := range objects.Services {
-				obj.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
-				dumpObj(t, obj)
 			}
 
 			store, err := store.NewFakeStore(objects)
@@ -4801,10 +4670,14 @@ func TestPickPort(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			store, err := store.NewFakeStore(tt.objs)
+			s, err := store.NewFakeStore(tt.objs)
 			assert.NoError(err)
 
-			p := mustNewParser(t, store)
+			y, err := store.DumpAsYaml(tt.objs)
+			require.NoError(t, err)
+			t.Logf("\n%s", string(y))
+
+			p := mustNewParser(t, s)
 			result := p.BuildKongConfig()
 			require.Empty(t, result.TranslationFailures)
 

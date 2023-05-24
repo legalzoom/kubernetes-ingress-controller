@@ -4,7 +4,7 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: kong
   labels:
-    global: "true"
+    global: 'true'
   name: bar-plugin
 plugin: basic-auth
 protocols:

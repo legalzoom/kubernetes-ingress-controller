@@ -1,0 +1,71 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: kong
+  name: foo
+  namespace: foo-namespace
+spec:
+  rules:
+    - host: example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: service-1
+                port: { }
+            path: /
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: kong
+  name: service-1
+  namespace: foo-namespace
+spec:
+  ports:
+    - name: port1
+      port: 9999
+      targetPort: 0
+---
+addressType: ""
+apiVersion: discovery.k8s.io/v1
+endpoints:
+  - addresses:
+      - 1.1.1.1
+    conditions: { }
+kind: EndpointSlice
+metadata:
+  labels:
+    kubernetes.io/service-name: service-0
+  name: service-0-1
+  namespace: foo-namespace
+ports:
+  - name: port1
+    port: 111
+    protocol: TCP
+  - name: port2
+    port: 222
+    protocol: TCP
+  - name: port3
+    port: 333
+    protocol: TCP
+---
+addressType: ""
+apiVersion: discovery.k8s.io/v1
+endpoints:
+  - addresses:
+      - 2.2.2.2
+    conditions: { }
+kind: EndpointSlice
+metadata:
+  labels:
+    kubernetes.io/service-name: service-1
+  name: service-1-1
+  namespace: foo-namespace
+ports:
+  - name: port1
+    port: 9999
+    protocol: TCP
+---

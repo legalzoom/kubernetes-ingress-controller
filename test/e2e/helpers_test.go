@@ -415,8 +415,7 @@ func verifyIngressWithEchoBackends(ctx context.Context, t *testing.T, env enviro
 		}
 		assert.Len(c, uniqueResponses, numberOfEchoBackends)
 	},
-		ingressWait, 100*time.Millisecond,
-		"expected responses from all %d backends, got from %d", numberOfEchoBackends, len(uniqueResponses),
+		ingressWait, 10*time.Millisecond,
 	)
 
 	t.Log("verifying the KongIngress method restriction")
@@ -430,7 +429,7 @@ func verifyIngressWithEchoBackends(ctx context.Context, t *testing.T, env enviro
 		defer resp.Body.Close()
 		assert.Equal(c, http.StatusNotFound, resp.StatusCode)
 	},
-		ingressWait, 100*time.Millisecond,
+		ingressWait, 10*time.Millisecond,
 	)
 }
 

@@ -1692,10 +1692,14 @@ func TestKongRouteAnnotations(t *testing.T) {
 			},
 		}
 
-		store, err := store.NewFakeStore(store.FakeObjects{
+		objs := store.FakeObjects{
 			IngressesV1: ingresses,
 			Services:    services,
-		})
+		}
+		y, err := objs.DumpAsYAML()
+		require.NoError(t, err)
+		t.Logf("dumped objects:\n%s", string(y))
+		store, err := store.NewFakeStore(objs)
 		require.NoError(t, err)
 		p := mustNewParser(t, store)
 		result := p.BuildKongConfig()

@@ -3,24 +3,23 @@ package parser_test
 import (
 	"bytes"
 	"context"
-	"flag"
 	"os"
 	"testing"
 
-	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane/deckgen"
-	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane/parser"
-	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
+	"github.com/blang/semver/v4"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/yaml"
+
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane/deckgen"
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane/parser"
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 )
 
-var (
-	// Tells whether to update golden files using the current output of the parser.
-	updateGolden = os.Getenv("UPDATE_GOLDEN") == "true"
-)
+// Tells whether to update golden files using the current output of the parser.
+var updateGolden = os.Getenv("UPDATE_GOLDEN") == "true"
 
 // TestParser_GoldenTests runs the golden tests for the parser.
 // Every test case:
@@ -38,8 +37,6 @@ var (
 // If you introduce a change that may affect many test cases, and you're sure about it correctness, you can run the
 // whole suite with the -update-golden flag as well to regenerate all golden files.
 func TestParser_GoldenTests(t *testing.T) {
-	flag.Parse()
-
 	testCases := []struct {
 		name                 string
 		featureFlagsModifier func(flags *parser.FeatureFlags)
@@ -105,7 +102,7 @@ func runParserGoldenTest(t *testing.T, flags parser.FeatureFlags, k8sConfigFile 
 
 	// Create the parser.
 	s := store.New(cacheStores, "kong", logger)
-	p, err := parser.NewParser(logger, s, flags)
+	p, err := parser.NewParser(logger, s, flags, semver.MustParse("3.3"))
 	require.NoError(t, err, "Failed creating parser")
 
 	// Build the Kong configuration.
@@ -126,7 +123,7 @@ func runParserGoldenTest(t *testing.T, flags parser.FeatureFlags, k8sConfigFile 
 
 	// If the update flag is set, update the golden file with the result...
 	if updateGolden {
-		err = os.WriteFile(goldenFile, resultB, 0644)
+		err = os.WriteFile(goldenFile, resultB, 0o600)
 		require.NoError(t, err, "Failed writing to golden file")
 		t.Logf("Updated golden file %s", goldenFile)
 	} else {
@@ -137,7 +134,8 @@ func runParserGoldenTest(t *testing.T, flags parser.FeatureFlags, k8sConfigFile 
 		require.Equalf(t, string(goldenB), string(resultB),
 			"Golden file %s does not match the result. \n"+
 				"If you are sure the result is correct, run the test "+
-				"with the -update-golden flag to update the golden file.",
+				"with the -update-golden flag to update the golden file: "+
+				"make test.update.golden).",
 			goldenFile)
 		t.Logf("Successfully compared result to golden file %s", goldenFile)
 	}

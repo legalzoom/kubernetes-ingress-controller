@@ -26,7 +26,7 @@ func serviceBackendPortToStr(port netv1.ServiceBackendPort) string {
 var priorityForPath = map[netv1.PathType]int{
 	netv1.PathTypeExact:                  300,
 	netv1.PathTypePrefix:                 200,
-	netv1.PathTypeImplementationSpecific: 100,
+	netv1.PathTypeImplementationSpecific: 50,
 }
 
 func (p *Parser) ingressRulesFromIngressV1() ingressRules {

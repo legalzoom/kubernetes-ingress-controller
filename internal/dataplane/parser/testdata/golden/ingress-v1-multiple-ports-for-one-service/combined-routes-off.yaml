@@ -20,7 +20,7 @@ services:
     protocols:
     - http
     - https
-    regex_priority: 100
+    regex_priority: 50
     request_buffering: true
     response_buffering: true
     strip_path: false
@@ -56,7 +56,7 @@ services:
     protocols:
     - http
     - https
-    regex_priority: 100
+    regex_priority: 50
     request_buffering: true
     response_buffering: true
     strip_path: false

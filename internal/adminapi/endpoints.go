@@ -99,9 +99,11 @@ func AdminAPIsFromEndpointSlice(
 		}
 
 		for _, e := range endpoints.Endpoints {
-			if e.Conditions.Ready == nil || !*e.Conditions.Ready {
-				continue
-			}
+			// TODO: Instead of relying on the Ready condition, let's manually check the `/status` endpoint.
+			// When it returns 200, we can assume the Admin API is ready.
+			// if e.Conditions.Ready == nil || !*e.Conditions.Ready {
+			// 	continue
+			// }
 
 			// We do not take into account endpoints that are not backed by a Pod.
 			if e.TargetRef == nil || e.TargetRef.Kind != "Pod" {

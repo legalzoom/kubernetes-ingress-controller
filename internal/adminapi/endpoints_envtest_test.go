@@ -84,8 +84,7 @@ func TestGetAdminAPIsForServiceReturnsAllAddressesCorrectlyPagingThroughResults(
 							{
 								Addresses: []string{fmt.Sprintf("10.0.%d.%d", i, j)},
 								Conditions: discoveryv1.EndpointConditions{
-									Ready:       lo.ToPtr(true),
-									Terminating: lo.ToPtr(false),
+									Ready: lo.ToPtr(true),
 								},
 								TargetRef: testPodReference("pod-1", ns.Name),
 							},

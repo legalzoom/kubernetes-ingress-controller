@@ -34,6 +34,10 @@ import (
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/util"
 )
 
+var (
+	genericUpdateError = errors.New("update has failed")
+)
+
 func TestUniqueObjects(t *testing.T) {
 	t.Log("generating some objects to test the de-duplication of objects")
 	ing1 := &netv1.Ingress{
@@ -144,7 +148,7 @@ func (f mockGatewayClientsProvider) GatewayClients() []*adminapi.Client {
 // mockUpdateStrategy is a mock implementation of sendconfig.UpdateStrategyResolver.
 type mockUpdateStrategyResolver struct {
 	updateCalledForURLs       []string
-	shouldReturnErrorOnUpdate map[string]struct{}
+	shouldReturnErrorOnUpdate map[string]error
 	t                         *testing.T
 	lock                      sync.RWMutex
 }
@@ -152,7 +156,7 @@ type mockUpdateStrategyResolver struct {
 func newMockUpdateStrategyResolver(t *testing.T) *mockUpdateStrategyResolver {
 	return &mockUpdateStrategyResolver{
 		t:                         t,
-		shouldReturnErrorOnUpdate: map[string]struct{}{},
+		shouldReturnErrorOnUpdate: map[string]error{},
 	}
 }
 
@@ -165,12 +169,12 @@ func (f *mockUpdateStrategyResolver) ResolveUpdateStrategy(c sendconfig.UpdateCl
 }
 
 // returnErrorOnUpdate will cause the mockUpdateStrategy with a given Admin API URL to return an error on Update().
-func (f *mockUpdateStrategyResolver) returnErrorOnUpdate(url string, shouldReturnErr bool) {
+func (f *mockUpdateStrategyResolver) returnErrorOnUpdate(url string, err error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	if shouldReturnErr {
-		f.shouldReturnErrorOnUpdate[url] = struct{}{}
+	if err != nil {
+		f.shouldReturnErrorOnUpdate[url] = err
 	} else {
 		delete(f.shouldReturnErrorOnUpdate, url)
 	}
@@ -184,8 +188,8 @@ func (f *mockUpdateStrategyResolver) updateCalledForURLCallback(url string) func
 		defer f.lock.Unlock()
 
 		f.updateCalledForURLs = append(f.updateCalledForURLs, url)
-		if _, ok := f.shouldReturnErrorOnUpdate[url]; ok {
-			return errors.New("error on update")
+		if errToReturn := f.shouldReturnErrorOnUpdate[url]; errToReturn != nil {
+			return errToReturn
 		}
 		return nil
 	}
@@ -310,7 +314,7 @@ func TestKongClientUpdate_AllExpectedClientsAreCalledAndErrorIsPropagated(t *tes
 			}
 			updateStrategyResolver := newMockUpdateStrategyResolver(t)
 			for _, url := range tc.errorOnUpdateForURLs {
-				updateStrategyResolver.returnErrorOnUpdate(url, true)
+				updateStrategyResolver.returnErrorOnUpdate(url, genericUpdateError)
 			}
 			// always return true for HasConfigurationChanged to trigger an update
 			configChangeDetector := mockConfigurationChangeDetector{hasConfigurationChanged: true}
@@ -330,6 +334,30 @@ func TestKongClientUpdate_AllExpectedClientsAreCalledAndErrorIsPropagated(t *tes
 		})
 	}
 }
+
+// func TestKongClientUpdate_UpdateSkippedDueToBackoffStrategyError(t *testing.T) {
+// 	konnectClient := mustSampleKonnectClient(t)
+// 	clientsProvider := mockGatewayClientsProvider{
+// 		gatewayClients: []*adminapi.Client{
+// 			mustSampleGatewayClient(t),
+// 		},
+// 		konnectClient: konnectClient,
+// 	}
+// 	updateStrategyResolver := newMockUpdateStrategyResolver(t)
+// 	updateStrategyResolver.returnErrorOnUpdate()
+//
+// 	// no change in config, we'll expect no update to be called
+// 	configChangeDetector := mockConfigurationChangeDetector{hasConfigurationChanged: false}
+// 	configBuilder := newMockKongConfigBuilder()
+//
+// 	kongClient := setupTestKongClient(t, updateStrategyResolver, clientsProvider, configChangeDetector, configBuilder)
+//
+// 	ctx := context.Background()
+// 	err := kongClient.Update(ctx)
+// 	require.NoError(t, err)
+//
+// 	updateStrategyResolver.assertNoUpdateCalled()
+// }
 
 func TestKongClientUpdate_WhenNoChangeInConfigNoClientGetsCalled(t *testing.T) {
 	clientsProvider := mockGatewayClientsProvider{
@@ -425,45 +453,51 @@ func TestKongClientUpdate_ConfigStatusIsAlwaysNotified(t *testing.T) {
 
 	testCases := []struct {
 		name                string
-		gatewayFailure      bool
-		konnectFailure      bool
+		gatewayErr          error
+		konnectErr          error
 		translationFailures bool
 	}{
 		{
 			name:                "success",
-			gatewayFailure:      false,
-			konnectFailure:      false,
+			gatewayErr:          nil,
+			konnectErr:          nil,
 			translationFailures: false,
 		},
 		{
 			name:                "gateway failure",
-			gatewayFailure:      true,
-			konnectFailure:      false,
+			gatewayErr:          genericUpdateError,
+			konnectErr:          nil,
 			translationFailures: false,
 		},
 		{
 			name:                "translation failures",
-			gatewayFailure:      false,
-			konnectFailure:      false,
+			gatewayErr:          genericUpdateError,
+			konnectErr:          genericUpdateError,
 			translationFailures: true,
 		},
 		{
 			name:                "konnect failure",
-			gatewayFailure:      false,
-			konnectFailure:      true,
+			gatewayErr:          nil,
+			konnectErr:          genericUpdateError,
 			translationFailures: false,
 		},
 		{
 			name:                "both gateway and konnect failure",
-			gatewayFailure:      true,
-			konnectFailure:      true,
+			gatewayErr:          genericUpdateError,
+			konnectErr:          genericUpdateError,
 			translationFailures: false,
 		},
 		{
 			name:                "translation failures and konnect failure",
-			gatewayFailure:      false,
-			konnectFailure:      true,
+			gatewayErr:          nil,
+			konnectErr:          genericUpdateError,
 			translationFailures: true,
+		},
+		{
+			name:                "konnect skipped due to backoff strategy",
+			gatewayErr:          nil,
+			konnectErr:          sendconfig.NewUpdateSkippedDueToBackoffStrategyError("too many requests"),
+			translationFailures: false,
 		},
 	}
 
@@ -473,8 +507,8 @@ func TestKongClientUpdate_ConfigStatusIsAlwaysNotified(t *testing.T) {
 			statusQueue := newMockConfigStatusQueue()
 			kongClient.SetConfigStatusNotifier(statusQueue)
 
-			updateStrategyResolver.returnErrorOnUpdate(testGatewayClient.BaseRootURL(), tc.gatewayFailure)
-			updateStrategyResolver.returnErrorOnUpdate(testKonnectClient.BaseRootURL(), tc.konnectFailure)
+			updateStrategyResolver.returnErrorOnUpdate(testGatewayClient.BaseRootURL(), tc.gatewayErr)
+			updateStrategyResolver.returnErrorOnUpdate(testKonnectClient.BaseRootURL(), tc.konnectErr)
 			configBuilder.returnTranslationFailures(tc.translationFailures)
 
 			_ = kongClient.Update(ctx)

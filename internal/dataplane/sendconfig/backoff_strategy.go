@@ -2,6 +2,7 @@ package sendconfig
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -20,6 +21,10 @@ func NewUpdateSkippedDueToBackoffStrategyError(explanation string) UpdateSkipped
 
 func (e UpdateSkippedDueToBackoffStrategyError) Error() string {
 	return fmt.Sprintf("update skipped due to a backoff strategy not being satisfied: %s", e.explanation)
+}
+
+func (e UpdateSkippedDueToBackoffStrategyError) Is(target error) bool {
+	return errors.Is(target, UpdateSkippedDueToBackoffStrategyError{})
 }
 
 // UpdateStrategyWithBackoff decorates any UpdateStrategy to respect a passed adminapi.UpdateBackoffStrategy.

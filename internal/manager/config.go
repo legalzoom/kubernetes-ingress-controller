@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/util/kubernetes/object/status"
 	"github.com/samber/mo"
 	"github.com/spf13/pflag"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -86,7 +87,9 @@ type Config struct {
 	PublishService          OptionalNamespacedName
 	PublishStatusAddress    []string
 	PublishStatusAddressUDP []string
-	UpdateStatus            bool
+
+	UpdateStatus                bool
+	UpdateStatusQueueBufferSize int
 
 	// Kubernetes API toggling
 	IngressNetV1Enabled           bool
@@ -209,6 +212,7 @@ func (c *Config) FlagSet() *pflag.FlagSet {
 		`User-provided address CSV, for use in lieu of "publish-service-udp" when that Service lacks useful address information.`)
 	flagSet.BoolVar(&c.UpdateStatus, "update-status", true,
 		`Indicates if the ingress controller should update the status of resources (e.g. IP/Hostname for v1.Ingress, e.t.c.)`)
+	flagSet.IntVar(&c.UpdateStatusQueueBufferSize, "update-status-queue-buffer-size", status.DefaultBufferSize, "Size of the status update queue's underlying channels used for buffering updates.")
 
 	// Kubernetes API toggling
 	flagSet.BoolVar(&c.IngressNetV1Enabled, "enable-controller-ingress-networkingv1", true, "Enable the networking.k8s.io/v1 Ingress controller.")

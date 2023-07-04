@@ -12,14 +12,25 @@ import (
 // Queue - Vars & Consts
 // ----------------------------------------------------------------------------
 
-// defaultBufferSize indicates the buffer size of the underlying channels that
+// DefaultBufferSize indicates the buffer size of the underlying channels that
 // will be created for object kinds by default. This literally equates to the
 // number of Kubernetes objects which can be in the queue at a single time.
-const defaultBufferSize = 8192
+const DefaultBufferSize = 8192
 
 // ----------------------------------------------------------------------------
 // Queue - Public Types
 // ----------------------------------------------------------------------------
+
+// QueueOption provides a functional option for configuring a Queue object.
+type QueueOption func(*Queue)
+
+// WithBufferSize sets the buffer size of the underlying channels that will be
+// created for object kinds.
+func WithBufferSize(size int) QueueOption {
+	return func(q *Queue) {
+		q.subscriptionBufferSize = size
+	}
+}
 
 // Queue provides a pub/sub queue with channels for individual Kubernetes
 // objects, the purpose of which is to submit GenericEvents for those objects
@@ -27,16 +38,25 @@ const defaultBufferSize = 8192
 // the dataplane so that its status can be updated (for instance, with IP
 // address information in the case of Ingress resources).
 type Queue struct {
+	// subscriptionBufferSize indicates the buffer size of the underlying channels
+	// that will be created for object kinds' subscriptions.
+	subscriptionBufferSize int
+
 	lock     sync.RWMutex
 	channels map[string]chan event.GenericEvent
 }
 
 // NewQueue provides a new Queue object which can be used to
 // publish status update events or subscribe to those events.
-func NewQueue() *Queue {
-	return &Queue{
-		channels: make(map[string]chan event.GenericEvent),
+func NewQueue(opts ...QueueOption) *Queue {
+	q := &Queue{
+		subscriptionBufferSize: DefaultBufferSize,
+		channels:               make(map[string]chan event.GenericEvent),
 	}
+	for _, opt := range opts {
+		opt(q)
+	}
+	return q
 }
 
 // ----------------------------------------------------------------------------
@@ -71,7 +91,7 @@ func (q *Queue) getChanForKind(gvk schema.GroupVersionKind) chan event.GenericEv
 	defer q.lock.Unlock()
 	ch, ok := q.channels[gvk.String()]
 	if !ok { // if there's no channel built for this kind yet, make it
-		ch = make(chan event.GenericEvent, defaultBufferSize)
+		ch = make(chan event.GenericEvent, q.subscriptionBufferSize)
 		q.channels[gvk.String()] = ch
 	}
 	return ch

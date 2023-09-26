@@ -408,9 +408,6 @@ upstreams:
   - k8s-version:v1`
 	lastKnownGoodConfigGraph := mustGraphFromRawYAML(t, lastKnownGoodConfig)
 
-	// These are revisions of Kong config that we have persisted.
-	history := []graph.KongConfigGraph{lastKnownGoodConfigGraph}
-
 	// This is the current Kong config parser has generated.
 	currentConfig := `_format_version: "3.0"
 plugins:
@@ -538,7 +535,7 @@ upstreams:
 		},
 	}
 
-	fallbackConfig, err := graph.BuildFallbackKongConfig(history, currentConfigGraph, entitiesErrors)
+	fallbackConfig, err := graph.BuildFallbackKongConfig(lastKnownGoodConfigGraph, currentConfigGraph, entitiesErrors)
 	require.NoError(t, err)
 
 	lastGoodSvg := dumpGraphAsSVG(t, lastKnownGoodConfigGraph)

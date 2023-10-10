@@ -93,9 +93,10 @@ jobs:
 
   integration-tests:
     needs:
-    - should-run-with-secrets
+# todo: uncomment before merging to main
+#    - should-run-with-secrets
     - up-to-date
-    if: needs.should-run-with-secrets.outputs.result == 'true' && needs.up-to-date.outputs.status != 'true'
+#    if: needs.should-run-with-secrets.outputs.result == 'true' && needs.up-to-date.outputs.status != 'true'
     uses: ./.github/workflows/_integration_tests.yaml
     secrets: inherit
 

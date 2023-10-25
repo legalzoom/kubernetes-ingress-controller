@@ -17,7 +17,7 @@ import (
 )
 
 func getKongIngressForServices(
-	s store.Storer,
+	s store.StoreReader,
 	services map[string]*corev1.Service,
 ) (*kongv1.KongIngress, error) {
 	// loop through each service and retrieve the attached KongIngress resources.
@@ -49,7 +49,7 @@ func getKongIngressForServices(
 }
 
 func getKongIngressFromObjectMeta(
-	s store.Storer,
+	s store.StoreReader,
 	obj util.K8sObjectInfo,
 ) (
 	*kongv1.KongIngress, error,
@@ -58,7 +58,7 @@ func getKongIngressFromObjectMeta(
 }
 
 func getKongIngressFromObjAnnotations(
-	s store.Storer,
+	s store.StoreReader,
 	obj util.K8sObjectInfo,
 ) (
 	*kongv1.KongIngress, error,
@@ -80,7 +80,7 @@ func getKongIngressFromObjAnnotations(
 
 // getKongPluginOrKongClusterPlugin fetches a KongPlugin or KongClusterPlugin (as fallback) from the store.
 // If both are not found, an error is returned.
-func getKongPluginOrKongClusterPlugin(s store.Storer, namespace, name string) (
+func getKongPluginOrKongClusterPlugin(s store.StoreReader, namespace, name string) (
 	*kongv1.KongPlugin,
 	*kongv1.KongClusterPlugin,
 	error,
@@ -109,7 +109,7 @@ func getKongPluginOrKongClusterPlugin(s store.Storer, namespace, name string) (
 }
 
 func kongPluginFromK8SClusterPlugin(
-	s store.Storer,
+	s store.StoreReader,
 	k8sPlugin kongv1.KongClusterPlugin,
 ) (Plugin, error) {
 	var config kong.Configuration
@@ -159,7 +159,7 @@ func protocolsToStrings(protocols []kongv1.KongProtocol) (res []string) {
 }
 
 func kongPluginFromK8SPlugin(
-	s store.Storer,
+	s store.StoreReader,
 	k8sPlugin kongv1.KongPlugin,
 ) (Plugin, error) {
 	var config kong.Configuration
@@ -213,7 +213,7 @@ func RawConfigToConfiguration(config apiextensionsv1.JSON) (kong.Configuration, 
 }
 
 func namespacedSecretToConfiguration(
-	s store.Storer,
+	s store.StoreReader,
 	reference kongv1.NamespacedSecretValueFromSource) (
 	kong.Configuration, error,
 ) {

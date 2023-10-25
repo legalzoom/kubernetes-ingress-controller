@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -58,6 +59,7 @@ func setupControllers(
 	ctx context.Context,
 	mgr manager.Manager,
 	dataplaneClient controllers.DataPlane,
+	k8sObjectsStore store.Writer,
 	dataplaneAddressFinder *dataplane.AddressFinder,
 	udpDataplaneAddressFinder *dataplane.AddressFinder,
 	kubernetesStatusQueue *status.Queue,

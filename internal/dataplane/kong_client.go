@@ -32,7 +32,6 @@ import (
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane/parser"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane/sendconfig"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/metrics"
-	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/util"
 	dataplaneutil "github.com/kong/kubernetes-ingress-controller/v2/internal/util/dataplane"
 	k8sobj "github.com/kong/kubernetes-ingress-controller/v2/internal/util/kubernetes/object"
@@ -71,10 +70,6 @@ type KongClient struct {
 	// requestTimeout is the maximum amount of time that should be waited for
 	// requests to the data-plane to receive a response.
 	requestTimeout time.Duration
-
-	// cache is the Kubernetes object cache which is used to list Kubernetes
-	// objects for parsing into Kong objects.
-	cache *store.CacheStores
 
 	// kongConfig is the client configuration for the Kong Admin API
 	kongConfig sendconfig.Config
@@ -162,7 +157,6 @@ func NewKongClient(
 	configChangeDetector sendconfig.ConfigurationChangeDetector,
 	kongConfigFetcher configfetcher.LastValidConfigFetcher,
 	parser KongConfigBuilder,
-	cacheStores store.CacheStores,
 ) (*KongClient, error) {
 	c := &KongClient{
 		logger:                 logger,
@@ -170,7 +164,6 @@ func NewKongClient(
 		requestTimeout:         timeout,
 		diagnostic:             diagnostic,
 		prometheusMetrics:      metrics.NewCtrlFuncMetrics(),
-		cache:                  &cacheStores,
 		kongConfig:             kongConfig,
 		eventRecorder:          eventRecorder,
 		dbmode:                 dbMode,
@@ -198,31 +191,6 @@ func (c *KongClient) initializeControllerPodReference() {
 // -----------------------------------------------------------------------------
 // Dataplane Client - Kong - Public Methods
 // -----------------------------------------------------------------------------
-
-// UpdateObject accepts a Kubernetes controller-runtime client.Object and adds/updates that to the configuration cache.
-// It will be asynchronously converted into the upstream Kong DSL and applied to the Kong Admin API.
-// A status will later be added to the object whether the configuration update succeeds or fails.
-func (c *KongClient) UpdateObject(obj client.Object) error {
-	// we do a deep copy of the object here so that the caller can continue to use
-	// the original object in a threadsafe manner.
-	return c.cache.Add(obj.DeepCopyObject())
-}
-
-// DeleteObject accepts a Kubernetes controller-runtime client.Object and removes it from the configuration cache.
-// The delete action will asynchronously be converted to Kong DSL and applied to the Kong Admin API.
-// A status will later be added to the object whether the configuration update succeeds or fails.
-//
-// under the hood the cache implementation will ignore deletions on objects
-// that are not present in the cache, so in those cases this is a no-op.
-func (c *KongClient) DeleteObject(obj client.Object) error {
-	return c.cache.Delete(obj)
-}
-
-// ObjectExists indicates whether or not any version of the provided object is already present in the proxy.
-func (c *KongClient) ObjectExists(obj client.Object) (bool, error) {
-	_, exists, err := c.cache.Get(obj)
-	return exists, err
-}
 
 // allEqual returns true if all provided objects are equal.
 func allEqual[T any](objs ...T) bool {

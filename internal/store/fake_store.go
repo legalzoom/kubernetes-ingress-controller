@@ -66,8 +66,8 @@ type FakeObjects struct {
 // NewFakeStore creates a store backed by the objects passed in as arguments.
 func NewFakeStore(
 	objects FakeObjects,
-) (Storer, error) {
-	var s Storer
+) (StoreReader, error) {
+	var s StoreReader
 
 	ingressV1Store := cache.NewStore(keyFunc)
 	for _, ingress := range objects.IngressesV1 {

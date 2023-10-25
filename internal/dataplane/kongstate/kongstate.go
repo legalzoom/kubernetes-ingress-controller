@@ -60,7 +60,7 @@ func (ks *KongState) SanitizedCopy() *KongState {
 
 func (ks *KongState) FillConsumersAndCredentials(
 	logger logr.Logger,
-	s store.Storer,
+	s store.StoreReader,
 	failuresCollector *failures.ResourceFailuresCollector,
 ) {
 	consumerIndex := make(map[string]Consumer)
@@ -173,7 +173,7 @@ func (ks *KongState) FillConsumersAndCredentials(
 	}
 }
 
-func (ks *KongState) FillConsumerGroups(_ logr.Logger, s store.Storer) {
+func (ks *KongState) FillConsumerGroups(_ logr.Logger, s store.StoreReader) {
 	for _, cg := range s.ListKongConsumerGroups() {
 		ks.ConsumerGroups = append(ks.ConsumerGroups, ConsumerGroup{
 			ConsumerGroup: kong.ConsumerGroup{
@@ -185,7 +185,7 @@ func (ks *KongState) FillConsumerGroups(_ logr.Logger, s store.Storer) {
 	}
 }
 
-func (ks *KongState) FillOverrides(logger logr.Logger, s store.Storer) {
+func (ks *KongState) FillOverrides(logger logr.Logger, s store.StoreReader) {
 	for i := 0; i < len(ks.Services); i++ {
 		// Services
 		ks.Services[i].override()
@@ -288,7 +288,7 @@ func (ks *KongState) getPluginRelations() map[string]util.ForeignRelations {
 
 func buildPlugins(
 	logger logr.Logger,
-	s store.Storer,
+	s store.StoreReader,
 	failuresCollector *failures.ResourceFailuresCollector,
 	pluginRels map[string]util.ForeignRelations,
 ) []Plugin {
@@ -370,7 +370,7 @@ func buildPlugins(
 	return plugins
 }
 
-func globalKongClusterPlugins(logger logr.Logger, s store.Storer) ([]Plugin, error) {
+func globalKongClusterPlugins(logger logr.Logger, s store.StoreReader) ([]Plugin, error) {
 	res := make(map[string]Plugin)
 	var duplicates []string // keep track of duplicate
 	// TODO respect the oldest CRD
@@ -417,7 +417,7 @@ func globalKongClusterPlugins(logger logr.Logger, s store.Storer) ([]Plugin, err
 
 func (ks *KongState) FillPlugins(
 	log logr.Logger,
-	s store.Storer,
+	s store.StoreReader,
 	failuresCollector *failures.ResourceFailuresCollector,
 ) {
 	ks.Plugins = buildPlugins(log, s, failuresCollector, ks.getPluginRelations())

@@ -101,7 +101,7 @@ type LicenseGetter interface {
 // state configuration for the Kong Admin API.
 type Parser struct {
 	logger        logr.Logger
-	storer        store.Storer
+	storer        store.StoreReader
 	licenseGetter LicenseGetter
 	featureFlags  FeatureFlags
 
@@ -113,7 +113,7 @@ type Parser struct {
 // and a Kubernetes object store.
 func NewParser(
 	logger logr.Logger,
-	storer store.Storer,
+	storer store.StoreReader,
 	featureFlags FeatureFlags,
 ) (*Parser, error) {
 	failuresCollector := failures.NewResourceFailuresCollector(logger)
@@ -644,7 +644,7 @@ func mergeCerts(logger logr.Logger, certLists ...[]certWrapper) []kongstate.Cert
 
 func getServiceEndpoints(
 	logger logr.Logger,
-	s store.Storer,
+	s store.StoreReader,
 	svc *corev1.Service,
 	servicePort *corev1.ServicePort,
 ) []kongstate.Target {
@@ -684,7 +684,7 @@ func getServiceEndpoints(
 // getIngressClassParametersOrDefault returns the parameters for the current ingress class.
 // If the cluster operators have specified a set of parameters explicitly, it returns those.
 // Otherwise, it returns a default set of parameters.
-func getIngressClassParametersOrDefault(s store.Storer) (kongv1alpha1.IngressClassParametersSpec, error) {
+func getIngressClassParametersOrDefault(s store.StoreReader) (kongv1alpha1.IngressClassParametersSpec, error) {
 	ingressClassName := s.GetIngressClassName()
 	ingressClass, err := s.GetIngressClassV1(ingressClassName)
 	if err != nil {

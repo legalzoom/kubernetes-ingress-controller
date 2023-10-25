@@ -3,13 +3,13 @@ package configuration
 import (
 	"context"
 
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/annotations"
-	"github.com/kong/kubernetes-ingress-controller/v2/internal/controllers"
 	ctrlref "github.com/kong/kubernetes-ingress-controller/v2/internal/controllers/reference"
 	kongv1 "github.com/kong/kubernetes-ingress-controller/v2/pkg/apis/configuration/v1"
 	kongv1beta1 "github.com/kong/kubernetes-ingress-controller/v2/pkg/apis/configuration/v1beta1"
@@ -19,7 +19,7 @@ import (
 // currently it only updates reference records to secrets, since we wanted to limit cache size of secrets:
 // https://github.com/Kong/kubernetes-ingress-controller/issues/2868
 func updateReferredObjects(
-	ctx context.Context, client client.Client, refIndexers ctrlref.CacheIndexers, dataplaneClient controllers.DataPlane, obj client.Object,
+	ctx context.Context, client client.Client, refIndexers ctrlref.CacheIndexers, objectsStore store.Writer, obj client.Object,
 ) error {
 	referredSecretNameMap := make(map[k8stypes.NamespacedName]struct{})
 	var referredSecretList []k8stypes.NamespacedName
@@ -44,7 +44,7 @@ func updateReferredObjects(
 	for _, nsName := range referredSecretList {
 		referredSecretNameMap[nsName] = struct{}{}
 	}
-	return ctrlref.UpdateReferencesToSecret(ctx, client, refIndexers, dataplaneClient, obj, referredSecretNameMap)
+	return ctrlref.UpdateReferencesToSecret(ctx, client, refIndexers, objectsStore, obj, referredSecretNameMap)
 }
 
 func listCoreV1ServiceReferredSecrets(service *corev1.Service) []k8stypes.NamespacedName {

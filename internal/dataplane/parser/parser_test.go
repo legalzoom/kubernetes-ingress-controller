@@ -4749,7 +4749,7 @@ func TestParser_ConfiguredKubernetesObjects(t *testing.T) {
 	}
 }
 
-func mustNewParser(t *testing.T, storer store.Storer) *Parser {
+func mustNewParser(t *testing.T, storer store.StoreReader) *Parser {
 	p, err := NewParser(zapr.NewLogger(zap.NewNop()), storer,
 		FeatureFlags{
 			// We'll assume these are true for all tests.

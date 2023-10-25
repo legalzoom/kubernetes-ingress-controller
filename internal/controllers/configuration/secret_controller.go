@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,10 +35,11 @@ const (
 type CoreV1SecretReconciler struct {
 	client.Client
 
-	Log              logr.Logger
-	Scheme           *runtime.Scheme
-	DataplaneClient  controllers.DataPlane
-	CacheSyncTimeout time.Duration
+	Log                    logr.Logger
+	Scheme                 *runtime.Scheme
+	DataplaneClient        controllers.DataPlane
+	KubernetesObjectsStore store.Writer
+	CacheSyncTimeout       time.Duration
 
 	ReferenceIndexers ctrlref.CacheIndexers
 }
@@ -109,7 +111,7 @@ func (r *CoreV1SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if apierrors.IsNotFound(err) {
 			secret.Namespace = req.Namespace
 			secret.Name = req.Name
-			return ctrl.Result{}, r.DataplaneClient.DeleteObject(secret)
+			return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(secret)
 		}
 		return ctrl.Result{}, err
 	}
@@ -119,12 +121,12 @@ func (r *CoreV1SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// clean the object up if it's being deleted
 	if !secret.DeletionTimestamp.IsZero() && time.Now().After(secret.DeletionTimestamp.Time) {
 		log.V(util.DebugLevel).Info("resource is being deleted, its configuration will be removed", "type", "Secret", "namespace", req.Namespace, "name", req.Name)
-		objectExistsInCache, err := r.DataplaneClient.ObjectExists(secret)
+		objectExistsInCache, err := r.KubernetesObjectsStore.ObjectExists(secret)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		if objectExistsInCache {
-			if err := r.DataplaneClient.DeleteObject(secret); err != nil {
+			if err := r.KubernetesObjectsStore.DeleteObject(secret); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{Requeue: true}, nil // wait until the object is no longer present in the cache
@@ -133,7 +135,7 @@ func (r *CoreV1SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// update the kong Admin API with the changes
-	if err := r.DataplaneClient.UpdateObject(secret); err != nil {
+	if err := r.KubernetesObjectsStore.UpdateObject(secret); err != nil {
 		return ctrl.Result{}, err
 	}
 

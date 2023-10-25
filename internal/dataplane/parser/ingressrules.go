@@ -50,7 +50,7 @@ func mergeIngressRules(objs ...ingressRules) ingressRules {
 
 // populateServices populates the ServiceNameToServices map with additional information
 // and returns a map of services to be skipped.
-func (ir *ingressRules) populateServices(logger logr.Logger, s store.Storer, failuresCollector *failures.ResourceFailuresCollector) map[string]interface{} {
+func (ir *ingressRules) populateServices(logger logr.Logger, s store.StoreReader, failuresCollector *failures.ResourceFailuresCollector) map[string]interface{} {
 	serviceNamesToSkip := make(map[string]interface{})
 
 	// populate Kubernetes Service
@@ -242,7 +242,7 @@ func (s SNIs) Hosts() []string {
 
 func getK8sServicesForBackends(
 	log logr.Logger,
-	storer store.Storer,
+	storer store.StoreReader,
 	namespace string,
 	backends kongstate.ServiceBackends,
 ) ([]*corev1.Service, map[string]string) {

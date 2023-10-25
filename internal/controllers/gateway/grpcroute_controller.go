@@ -25,6 +25,7 @@ import (
 
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/controllers"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/gatewayapi"
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/util"
 	k8sobj "github.com/kong/kubernetes-ingress-controller/v2/internal/util/kubernetes/object"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/util/kubernetes/object/status"
@@ -38,10 +39,11 @@ import (
 type GRPCRouteReconciler struct {
 	client.Client
 
-	Log             logr.Logger
-	Scheme          *runtime.Scheme
-	DataplaneClient controllers.DataPlane
-	StatusQueue     *status.Queue
+	Log                    logr.Logger
+	Scheme                 *runtime.Scheme
+	DataplaneClient        controllers.DataPlane
+	KubernetesObjectsStore store.Writer
+	StatusQueue            *status.Queue
 	// If EnableReferenceGrant is true, we will check for ReferenceGrant if backend in another
 	// namespace is in backendRefs.
 	// If it is false, referencing backend in different namespace will be rejected.
@@ -266,7 +268,7 @@ func (r *GRPCRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			debug(log, grpcroute, "object does not exist, ensuring it is not present in the proxy cache")
 			grpcroute.Namespace = req.Namespace
 			grpcroute.Name = req.Name
-			return ctrl.Result{}, r.DataplaneClient.DeleteObject(grpcroute)
+			return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(grpcroute)
 		}
 
 		// for any error other than 404, requeue
@@ -282,12 +284,12 @@ func (r *GRPCRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	debug(log, grpcroute, "checking deletion timestamp")
 	if grpcroute.DeletionTimestamp != nil {
 		debug(log, grpcroute, "grpcroute is being deleted, re-configuring data-plane")
-		if err := r.DataplaneClient.DeleteObject(grpcroute); err != nil {
+		if err := r.KubernetesObjectsStore.DeleteObject(grpcroute); err != nil {
 			debug(log, grpcroute, "failed to delete object from data-plane, requeuing")
 			return ctrl.Result{}, err
 		}
 		debug(log, grpcroute, "ensured object was removed from the data-plane (if ever present)")
-		return ctrl.Result{}, r.DataplaneClient.DeleteObject(grpcroute)
+		return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(grpcroute)
 	}
 
 	// we need to pull the Gateway parent objects for the grpcroute to verify
@@ -317,7 +319,7 @@ func (r *GRPCRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// ensure that it's removed from the proxy cache to avoid orphaned data-plane
 			// configurations.
 			debug(log, grpcroute, "ensuring that dataplane is updated to remove unsupported route (if applicable)")
-			return ctrl.Result{}, r.DataplaneClient.DeleteObject(grpcroute)
+			return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(grpcroute)
 		}
 		return ctrl.Result{}, err
 	}
@@ -336,13 +338,13 @@ func (r *GRPCRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if isRouteAccepted(gateways) {
 		// if the gateways are ready, and the GRPCRoute is destined for them, ensure that
 		// the object is pushed to the dataplane.
-		if err := r.DataplaneClient.UpdateObject(grpcroute); err != nil {
+		if err := r.KubernetesObjectsStore.UpdateObject(grpcroute); err != nil {
 			debug(log, grpcroute, "failed to update object in data-plane, requeueing")
 			return ctrl.Result{}, err
 		}
 	} else {
 		// route is not accepted, remove it from kong store
-		if err := r.DataplaneClient.DeleteObject(grpcroute); err != nil {
+		if err := r.KubernetesObjectsStore.DeleteObject(grpcroute); err != nil {
 			debug(log, grpcroute, "failed to delete object in data-plane, requeueing")
 			return ctrl.Result{}, err
 		}

@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kong/kubernetes-ingress-controller/v2/internal/controllers"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/manager/scheme"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/util"
 )
@@ -217,7 +217,7 @@ func (c CacheIndexers) DeleteReferencesByReferrer(referrer client.Object) error 
 
 // DeleteObjectIfNotReferred deletes object from object cach by dataplaneClient
 // the object is not referenced in reference cache.
-func (c CacheIndexers) DeleteObjectIfNotReferred(obj client.Object, dataplaneClient controllers.DataPlaneClient) error {
+func (c CacheIndexers) DeleteObjectIfNotReferred(obj client.Object, objectsStore store.Writer) error {
 	referred, err := c.ObjectReferred(obj)
 	if err != nil {
 		return err
@@ -228,7 +228,7 @@ func (c CacheIndexers) DeleteObjectIfNotReferred(obj client.Object, dataplaneCli
 			"namespace", obj.GetNamespace(),
 			"name", obj.GetName(),
 		)
-		return dataplaneClient.DeleteObject(obj)
+		return objectsStore.DeleteObject(obj)
 	}
 	return nil
 }

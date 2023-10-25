@@ -3,13 +3,12 @@ package reference
 import (
 	"context"
 
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/kong/kubernetes-ingress-controller/v2/internal/controllers"
 )
 
 const (
@@ -22,7 +21,7 @@ const (
 // in namespacedNames in record cache.
 func UpdateReferencesToSecret(
 	ctx context.Context,
-	c client.Client, indexers CacheIndexers, dataplaneClient controllers.DataPlaneClient,
+	c client.Client, indexers CacheIndexers, objectsStore store.Writer,
 	referrer client.Object, referencedSecretNameMap map[k8stypes.NamespacedName]struct{},
 ) error {
 	for nsName := range referencedSecretNameMap {
@@ -49,12 +48,12 @@ func UpdateReferencesToSecret(
 			return err
 		}
 
-		if err := dataplaneClient.UpdateObject(secret); err != nil {
+		if err := objectsStore.UpdateObject(secret); err != nil {
 			return err
 		}
 	}
 
-	return removeOutdatedReferencesToSecret(ctx, indexers, c, dataplaneClient, referrer, referencedSecretNameMap)
+	return removeOutdatedReferencesToSecret(ctx, indexers, c, objectsStore, referrer, referencedSecretNameMap)
 }
 
 // removeOutdatedReferenceToSecret removes outdated reference records to secrets in reference indexer.
@@ -64,7 +63,7 @@ func UpdateReferencesToSecret(
 // and should be removed from the object cache inside KongClient.
 func removeOutdatedReferencesToSecret(
 	ctx context.Context,
-	indexers CacheIndexers, c client.Client, dataplaneClient controllers.DataPlaneClient,
+	indexers CacheIndexers, c client.Client, objectsStore store.Writer,
 	referrer client.Object, referredSecretNameMap map[k8stypes.NamespacedName]struct{},
 ) error {
 	referents, err := indexers.ListReferredObjects(referrer)
@@ -107,7 +106,7 @@ func removeOutdatedReferencesToSecret(
 				}
 			}
 
-			if err := indexers.DeleteObjectIfNotReferred(obj, dataplaneClient); err != nil {
+			if err := indexers.DeleteObjectIfNotReferred(obj, objectsStore); err != nil {
 				return err
 			}
 		}
@@ -118,7 +117,7 @@ func removeOutdatedReferencesToSecret(
 // DeleteReferencesByReferrer deletes all reference records with specified referrer
 // in reference cache.
 // If the affected secret is not referred by any other objects, it deletes the secret in object cache.
-func DeleteReferencesByReferrer(indexers CacheIndexers, dataplaneClient controllers.DataPlaneClient, referrer client.Object) error {
+func DeleteReferencesByReferrer(indexers CacheIndexers, objectsStore store.Writer, referrer client.Object) error {
 	referents, err := indexers.ListReferredObjects(referrer)
 	if err != nil {
 		indexers.logger.Error(err, "failed to list referred objects",
@@ -143,7 +142,7 @@ func DeleteReferencesByReferrer(indexers CacheIndexers, dataplaneClient controll
 		if !(gvk.Group == corev1.GroupName && gvk.Version == VersionV1 && gvk.Kind == KindSecret) {
 			continue
 		}
-		err := indexers.DeleteObjectIfNotReferred(referent, dataplaneClient)
+		err := indexers.DeleteObjectIfNotReferred(referent, objectsStore)
 		if err != nil {
 			return err
 		}

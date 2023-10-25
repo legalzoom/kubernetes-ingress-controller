@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,11 +42,12 @@ import (
 type HTTPRouteReconciler struct {
 	client.Client
 
-	Log              logr.Logger
-	Scheme           *runtime.Scheme
-	DataplaneClient  controllers.DataPlane
-	CacheSyncTimeout time.Duration
-	StatusQueue      *status.Queue
+	Log                    logr.Logger
+	Scheme                 *runtime.Scheme
+	DataplaneClient        controllers.DataPlane
+	KubernetesObjectsStore store.Writer
+	CacheSyncTimeout       time.Duration
+	StatusQueue            *status.Queue
 
 	// If enableReferenceGrant is true, we will check for ReferenceGrant if backend in another
 	// namespace is in backendRefs.
@@ -341,7 +343,7 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			debug(log, httproute, "object does not exist, ensuring it is not present in the proxy cache")
 			httproute.Namespace = req.Namespace
 			httproute.Name = req.Name
-			return ctrl.Result{}, r.DataplaneClient.DeleteObject(httproute)
+			return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(httproute)
 		}
 
 		// for any error other than 404, requeue
@@ -357,12 +359,12 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	debug(log, httproute, "checking deletion timestamp")
 	if httproute.DeletionTimestamp != nil {
 		debug(log, httproute, "httproute is being deleted, re-configuring data-plane")
-		if err := r.DataplaneClient.DeleteObject(httproute); err != nil {
+		if err := r.KubernetesObjectsStore.DeleteObject(httproute); err != nil {
 			debug(log, httproute, "failed to delete object from data-plane, requeuing")
 			return ctrl.Result{}, err
 		}
 		debug(log, httproute, "ensured object was removed from the data-plane (if ever present)")
-		return ctrl.Result{}, r.DataplaneClient.DeleteObject(httproute)
+		return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(httproute)
 	}
 
 	// we need to pull the Gateway parent objects for the HTTPRoute to verify
@@ -392,7 +394,7 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// ensure that it's removed from the proxy cache to avoid orphaned data-plane
 			// configurations.
 			debug(log, httproute, "ensuring that dataplane is updated to remove unsupported route (if applicable)")
-			return ctrl.Result{}, r.DataplaneClient.DeleteObject(httproute)
+			return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(httproute)
 		}
 		return ctrl.Result{}, err
 	}
@@ -416,13 +418,13 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if isRouteAccepted(gateways) && err == nil {
 		// if the gateways are ready, and the HTTPRoute is destined for them, ensure that
 		// the object is pushed to the dataplane.
-		if err := r.DataplaneClient.UpdateObject(filteredHTTPRoute); err != nil {
+		if err := r.KubernetesObjectsStore.UpdateObject(filteredHTTPRoute); err != nil {
 			debug(log, httproute, "failed to update object in data-plane, requeueing")
 			return ctrl.Result{}, err
 		}
 	} else {
 		// route is not accepted, remove it from kong store
-		if err := r.DataplaneClient.DeleteObject(httproute); err != nil {
+		if err := r.KubernetesObjectsStore.DeleteObject(httproute); err != nil {
 			debug(log, httproute, "failed to delete object in data-plane, requeueing")
 			return ctrl.Result{}, err
 		}

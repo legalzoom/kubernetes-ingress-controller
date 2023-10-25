@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kong/go-kong/kong"
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	"github.com/samber/mo"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,9 +48,10 @@ var gatewayV1Group = gatewayapi.Group(gatewayv1.GroupName)
 type GatewayReconciler struct { //nolint:revive
 	client.Client
 
-	Log             logr.Logger
-	Scheme          *runtime.Scheme
-	DataplaneClient controllers.DataPlane
+	Log                    logr.Logger
+	Scheme                 *runtime.Scheme
+	DataplaneClient        controllers.DataPlane
+	KubernetesObjectsStore store.Writer
 
 	WatchNamespaces  []string
 	CacheSyncTimeout time.Duration
@@ -340,12 +342,12 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			gateway.Namespace = req.Namespace
 			gateway.Name = req.Name
 			// delete reference relationships where the gateway is the referrer.
-			err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.DataplaneClient, gateway)
+			err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.KubernetesObjectsStore, gateway)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
 			debug(log, gateway, "reconciliation triggered but gateway does not exist, deleting it in dataplane")
-			return ctrl.Result{}, r.DataplaneClient.DeleteObject(gateway)
+			return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(gateway)
 		}
 		return ctrl.Result{Requeue: true}, err
 	}
@@ -361,11 +363,11 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: string(gateway.Spec.GatewayClassName)}, gwc); err != nil {
 		debug(log, gateway, "could not retrieve gatewayclass for gateway", "gatewayclass", string(gateway.Spec.GatewayClassName))
 		// delete reference relationships where the gateway is the referrer, as we will not process the gateway.
-		err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.DataplaneClient, gateway)
+		err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.KubernetesObjectsStore, gateway)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.DataplaneClient.DeleteObject(gateway); err != nil {
+		if err := r.KubernetesObjectsStore.DeleteObject(gateway); err != nil {
 			debug(log, gateway, "failed to delete object from data-plane, requeuing")
 			return ctrl.Result{}, err
 		}
@@ -375,11 +377,11 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if gwc.Spec.ControllerName != GetControllerName() {
 		debug(log, gateway, "unsupported gatewayclass controllername, ignoring", "gatewayclass", gwc.Name, "controllername", gwc.Spec.ControllerName)
 		// delete reference relationships where the gateway is the referrer, as we will not process the gateway.
-		err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.DataplaneClient, gateway)
+		err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.KubernetesObjectsStore, gateway)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.DataplaneClient.DeleteObject(gateway); err != nil {
+		if err := r.KubernetesObjectsStore.DeleteObject(gateway); err != nil {
 			debug(log, gateway, "failed to delete object from data-plane, requeuing")
 			return ctrl.Result{}, err
 		}
@@ -410,14 +412,14 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// reconcileUnmanagedGateway has side effects and modifies the referenced gateway object. dataplane updates must
 	// happen afterwards
 	if err == nil {
-		if err := r.DataplaneClient.UpdateObject(gateway); err != nil {
+		if err := r.KubernetesObjectsStore.UpdateObject(gateway); err != nil {
 			debug(log, gateway, "failed to update object in data-plane, requeueing")
 			return result, err
 		}
 
 		referredSecretNames := listSecretNamesReferredByGateway(gateway)
 		if err := ctrlref.UpdateReferencesToSecret(
-			ctx, r.Client, r.ReferenceIndexers, r.DataplaneClient,
+			ctx, r.Client, r.ReferenceIndexers, r.KubernetesObjectsStore,
 			gateway, referredSecretNames); err != nil {
 			if apierrors.IsNotFound(err) {
 				result.Requeue = true

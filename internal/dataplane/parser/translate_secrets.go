@@ -76,7 +76,7 @@ func toKongCACertificate(certSecret *corev1.Secret, secretID string) (kong.CACer
 	}, nil
 }
 
-func getPluginsAssociatedWithCACertSecret(secretID string, storer store.Storer) []client.Object {
+func getPluginsAssociatedWithCACertSecret(secretID string, storer store.StoreReader) []client.Object {
 	refersToSecret := func(pluginConfig apiextensionsv1.JSON) bool {
 		cfg := struct {
 			CACertificates []string `json:"ca_certificates,omitempty"`

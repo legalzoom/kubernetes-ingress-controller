@@ -174,10 +174,10 @@ func Run(
 		return err
 	}
 
-	cache := store.NewCacheStores()
+	k8sObjectsStore := store.New(store.NewCacheStores(), c.IngressClassName, logger)
 	configParser, err := parser.NewParser(
 		logger,
-		store.New(cache, c.IngressClassName, logger),
+		k8sObjectsStore,
 		parserFeatureFlags,
 	)
 	if err != nil {
@@ -200,7 +200,6 @@ func Run(
 		configurationChangeDetector,
 		kongConfigFetcher,
 		configParser,
-		cache,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize kong data-plane client: %w", err)
@@ -232,6 +231,7 @@ func Run(
 		ctx,
 		mgr,
 		dataplaneClient,
+		k8sObjectsStore,
 		dataplaneAddressFinder,
 		udpDataplaneAddressFinder,
 		kubernetesStatusQueue,

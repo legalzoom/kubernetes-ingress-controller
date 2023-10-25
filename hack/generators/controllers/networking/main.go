@@ -409,14 +409,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/controllers"
-	ctrlref "github.com/kong/kubernetes-ingress-controller/v2/internal/controllers/reference"
-	ctrlutils "github.com/kong/kubernetes-ingress-controller/v2/internal/controllers/utils"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane"
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/store"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/util"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/util/kubernetes/object/status"
+	ctrlref "github.com/kong/kubernetes-ingress-controller/v2/internal/controllers/reference"
+	ctrlutils "github.com/kong/kubernetes-ingress-controller/v2/internal/controllers/utils"
 	kongv1 "github.com/kong/kubernetes-ingress-controller/v2/pkg/apis/configuration/v1"
-	kongv1beta1 "github.com/kong/kubernetes-ingress-controller/v2/pkg/apis/configuration/v1beta1"
 	kongv1alpha1 "github.com/kong/kubernetes-ingress-controller/v2/pkg/apis/configuration/v1alpha1"
+	kongv1beta1 "github.com/kong/kubernetes-ingress-controller/v2/pkg/apis/configuration/v1beta1"
 )
 `
 
@@ -440,6 +441,7 @@ type {{.PackageAlias}}{{.Kind}}Reconciler struct {
 	Log             logr.Logger
 	Scheme          *runtime.Scheme
 	DataplaneClient controllers.DataPlane
+	KubernetesObjectsStore store.Writer
 	CacheSyncTimeout time.Duration
 {{- if .IngressAddressUpdatesEnabled }}
 
@@ -556,11 +558,11 @@ func (r *{{.PackageAlias}}{{.Kind}}Reconciler) Reconcile(ctx context.Context, re
 			obj.Name = req.Name
 			{{if .NeedsUpdateReferences}}
 			// remove reference record where the {{.Kind}} is the referrer
-			if err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.DataplaneClient, obj); err != nil {
+			if err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.KubernetesObjectsStore, obj); err != nil {
 				return ctrl.Result{}, err
 			}
 			{{end}}
-			return ctrl.Result{}, r.DataplaneClient.DeleteObject(obj)
+			return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(obj)
 		}
 		return ctrl.Result{}, err
 	}
@@ -571,16 +573,16 @@ func (r *{{.PackageAlias}}{{.Kind}}Reconciler) Reconcile(ctx context.Context, re
 		log.V(util.DebugLevel).Info("resource is being deleted, its configuration will be removed", "type", "{{.Kind}}", "namespace", req.Namespace, "name", req.Name)
 		{{if .NeedsUpdateReferences}}
 		// remove reference record where the {{.Kind}} is the referrer
-		if err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.DataplaneClient, obj); err != nil {
+		if err := ctrlref.DeleteReferencesByReferrer(r.ReferenceIndexers, r.KubernetesObjectsStore, obj); err != nil {
 			return ctrl.Result{}, err
 		}
 		{{end}}
-		objectExistsInCache, err := r.DataplaneClient.ObjectExists(obj)
+		objectExistsInCache, err := r.KubernetesObjectsStore.ObjectExists(obj)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		if objectExistsInCache {
-			if err := r.DataplaneClient.DeleteObject(obj); err != nil {
+			if err := r.KubernetesObjectsStore.DeleteObject(obj); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{Requeue: true}, nil // wait until the object is no longer present in the cache
@@ -602,20 +604,20 @@ func (r *{{.PackageAlias}}{{.Kind}}Reconciler) Reconcile(ctx context.Context, re
 	if !ctrlutils.MatchesIngressClass(obj, r.IngressClassName, ctrlutils.IsDefaultIngressClass(class)) {
 		log.V(util.DebugLevel).Info("object missing ingress class, ensuring it's removed from configuration",
 		"namespace", req.Namespace, "name", req.Name, "class", r.IngressClassName)
-		return ctrl.Result{}, r.DataplaneClient.DeleteObject(obj)
+		return ctrl.Result{}, r.KubernetesObjectsStore.DeleteObject(obj)
 	} else {
 		log.V(util.DebugLevel).Info("object has matching ingress class", "namespace", req.Namespace, "name", req.Name,
 		"class", r.IngressClassName)
 	}
 {{end}}
 	// update the kong Admin API with the changes
-	if err := r.DataplaneClient.UpdateObject(obj); err != nil {
+	if err := r.KubernetesObjectsStore.UpdateObject(obj); err != nil {
 		return ctrl.Result{}, err
 	}
 
 {{- define "updateReferences" }}
 	// update reference relationship from the {{.Kind}} to other objects.
-	if err := updateReferredObjects(ctx, r.Client, r.ReferenceIndexers, r.DataplaneClient, obj); err != nil {
+	if err := updateReferredObjects(ctx, r.Client, r.ReferenceIndexers, r.KubernetesObjectsStore, obj); err != nil {
 		if apierrors.IsNotFound(err) {
 			// reconcile again if the secret does not exist yet
 			return ctrl.Result{

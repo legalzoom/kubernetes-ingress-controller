@@ -68,7 +68,7 @@ func getPermittedForReferenceGrantFrom(
 // rules generated from a Gateway APIs route. The service name is provided by the caller.
 func generateKongServiceFromBackendRefWithName(
 	logger logr.Logger,
-	storer store.Storer,
+	storer store.StoreReader,
 	rules *ingressRules,
 	serviceName string,
 	route client.Object,
@@ -136,7 +136,7 @@ func generateKongServiceFromBackendRefWithName(
 // rules generated from a Gateway APIs route. The service name is computed from route and ruleNumber by the function.
 func generateKongServiceFromBackendRefWithRuleNumber(
 	logger logr.Logger,
-	storer store.Storer,
+	storer store.StoreReader,
 	rules *ingressRules,
 	route client.Object,
 	ruleNumber int,

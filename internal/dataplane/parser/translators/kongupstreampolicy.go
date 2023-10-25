@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	KongHashOnTypeHeader     string = "header"
-	KongHashOnTypeCookie     string = "cookie"
-	KongHashOnTypeQueryArg   string = "query_arg"
-	KongHashOnTypeURICapture string = "uri_capture"
+	KongHashTypeHeader     string = "header"
+	KongHashTypeCookie     string = "cookie"
+	KongHashTypeQueryArg   string = "query_arg"
+	KongHashTypeURICapture string = "uri_capture"
 )
 
 // TranslateKongUpstreamPolicy translates KongUpstreamPolicySpec to kong.Upstream. It makes assumption that
@@ -23,68 +23,68 @@ func TranslateKongUpstreamPolicy(policy kongv1beta1.KongUpstreamPolicySpec) *kon
 		Healthchecks: translateHealthchecks(policy.Healthchecks),
 		HostHeader:   policy.HostHeader,
 
-		HashOn:           translateHashOn(policy.HashOn),
-		HashOnHeader:     translateHashOnHeader(policy.HashOn),
-		HashOnURICapture: translateHashOnURICapture(policy.HashOn),
-		HashOnCookie:     translateHashOnCookie(policy.HashOn),
-		HashOnCookiePath: translateHashOnCookiePath(policy.HashOn),
-		HashOnQueryArg:   translateHashOnQueryArg(policy.HashOn),
+		HashOn:           translateHash(policy.Hash),
+		HashOnHeader:     translateHashHeader(policy.Hash),
+		HashOnURICapture: translateHashURICapture(policy.Hash),
+		HashOnCookie:     translateHashCookie(policy.Hash),
+		HashOnCookiePath: translateHashCookiePath(policy.Hash),
+		HashOnQueryArg:   translateHashQueryArg(policy.Hash),
 
-		HashFallback:           translateHashOn(policy.HashOnFallback),
-		HashFallbackHeader:     translateHashOnHeader(policy.HashOnFallback),
-		HashFallbackURICapture: translateHashOnURICapture(policy.HashOnFallback),
-		HashFallbackQueryArg:   translateHashOnQueryArg(policy.HashOnFallback),
+		HashFallback:           translateHash(policy.HashFallback),
+		HashFallbackHeader:     translateHashHeader(policy.HashFallback),
+		HashFallbackURICapture: translateHashURICapture(policy.HashFallback),
+		HashFallbackQueryArg:   translateHashQueryArg(policy.HashFallback),
 	}
 }
 
-func translateHashOn(hashOn *kongv1beta1.KongUpstreamHash) *string {
+func translateHash(hashOn *kongv1beta1.KongUpstreamHash) *string {
 	if hashOn == nil {
 		return nil
 	}
 	// CRD validations will ensure only one of hashOn fields can be set, therefore the order doesn't matter.
 	switch {
 	case hashOn.Header != nil:
-		return lo.ToPtr(KongHashOnTypeHeader)
+		return lo.ToPtr(KongHashTypeHeader)
 	case hashOn.Cookie != nil:
-		return lo.ToPtr(KongHashOnTypeCookie)
+		return lo.ToPtr(KongHashTypeCookie)
 	case hashOn.QueryArg != nil:
-		return lo.ToPtr(KongHashOnTypeQueryArg)
+		return lo.ToPtr(KongHashTypeQueryArg)
 	case hashOn.URICapture != nil:
-		return lo.ToPtr(KongHashOnTypeURICapture)
+		return lo.ToPtr(KongHashTypeURICapture)
 	default:
 		return nil
 	}
 }
 
-func translateHashOnHeader(hashOn *kongv1beta1.KongUpstreamHash) *string {
+func translateHashHeader(hashOn *kongv1beta1.KongUpstreamHash) *string {
 	if hashOn == nil {
 		return nil
 	}
 	return hashOn.Header
 }
 
-func translateHashOnCookie(hashOn *kongv1beta1.KongUpstreamHash) *string {
+func translateHashCookie(hashOn *kongv1beta1.KongUpstreamHash) *string {
 	if hashOn == nil {
 		return nil
 	}
 	return hashOn.Cookie
 }
 
-func translateHashOnQueryArg(hashOn *kongv1beta1.KongUpstreamHash) *string {
+func translateHashQueryArg(hashOn *kongv1beta1.KongUpstreamHash) *string {
 	if hashOn == nil {
 		return nil
 	}
 	return hashOn.QueryArg
 }
 
-func translateHashOnURICapture(hashOn *kongv1beta1.KongUpstreamHash) *string {
+func translateHashURICapture(hashOn *kongv1beta1.KongUpstreamHash) *string {
 	if hashOn == nil {
 		return nil
 	}
 	return hashOn.URICapture
 }
 
-func translateHashOnCookiePath(hashOn *kongv1beta1.KongUpstreamHash) *string {
+func translateHashCookiePath(hashOn *kongv1beta1.KongUpstreamHash) *string {
 	if hashOn == nil {
 		return nil
 	}

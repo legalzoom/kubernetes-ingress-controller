@@ -178,42 +178,42 @@ func TestCRDValidations(t *testing.T) {
 			},
 		},
 		{
-			name: "KongUpstreamPolicy - only one of spec.hashOn.(cookie|header|uriCapture|queryArg) can be set",
+			name: "KongUpstreamPolicy - only one of spec.hash.(cookie|header|uriCapture|queryArg) can be set",
 			scenario: func(ctx context.Context, t *testing.T, ns string) {
-				for i, invalidHashOn := range generateInvalidHashOns() {
-					invalidHashOn := invalidHashOn
-					t.Run(fmt.Sprintf("invalidHashOn[%d]", i), func(t *testing.T) {
+				for i, invalidHash := range generateInvalidHashs() {
+					invalidHash := invalidHash
+					t.Run(fmt.Sprintf("invalidHash[%d]", i), func(t *testing.T) {
 						err := createKongUpstreamPolicy(ctx, ctrlClient, ns, kongv1beta1.KongUpstreamPolicySpec{
-							HashOn: &invalidHashOn,
+							Hash: &invalidHash,
 						})
-						require.ErrorContains(t, err, "Only one of spec.hashOn.(cookie|header|uriCapture|queryArg) can be set.")
+						require.ErrorContains(t, err, "Only one of spec.hash.(cookie|header|uriCapture|queryArg) can be set.")
 					})
 				}
 			},
 		},
 		{
-			name: "KongUpstreamPolicy - only one of spec.hashOnFallback.(header|uriCapture|queryArg) can be set",
+			name: "KongUpstreamPolicy - only one of spec.hashFallback.(header|uriCapture|queryArg) can be set",
 			scenario: func(ctx context.Context, t *testing.T, ns string) {
-				invalidHashOns := lo.Reject(generateInvalidHashOns(), func(hashOn kongv1beta1.KongUpstreamHash, _ int) bool {
-					// Filter out Cookie which is not allowed in spec.hashOnFallback.
-					return hashOn.Cookie != nil
+				invalidHashs := lo.Reject(generateInvalidHashs(), func(hash kongv1beta1.KongUpstreamHash, _ int) bool {
+					// Filter out Cookie which is not allowed in spec.hashFallback.
+					return hash.Cookie != nil
 				})
-				for i, invalidHashOn := range invalidHashOns {
-					invalidHashOn := invalidHashOn
-					t.Run(fmt.Sprintf("invalidHashOn[%d]", i), func(t *testing.T) {
+				for i, invalidHash := range invalidHashs {
+					invalidHash := invalidHash
+					t.Run(fmt.Sprintf("invalidHash[%d]", i), func(t *testing.T) {
 						err := createKongUpstreamPolicy(ctx, ctrlClient, ns, kongv1beta1.KongUpstreamPolicySpec{
-							HashOnFallback: &invalidHashOn,
+							HashFallback: &invalidHash,
 						})
-						require.ErrorContains(t, err, "Only one of spec.hashOnFallback.(header|uriCapture|queryArg) can be set.")
+						require.ErrorContains(t, err, "Only one of spec.hashFallback.(header|uriCapture|queryArg) can be set.")
 					})
 				}
 			},
 		},
 		{
-			name: "KongUpstreamPolicy - spec.hashOn.cookie and spec.hashOn.cookiePath are set",
+			name: "KongUpstreamPolicy - spec.hash.cookie and spec.hash.cookiePath are set",
 			scenario: func(ctx context.Context, t *testing.T, ns string) {
 				err := createKongUpstreamPolicy(ctx, ctrlClient, ns, kongv1beta1.KongUpstreamPolicySpec{
-					HashOn: &kongv1beta1.KongUpstreamHash{
+					Hash: &kongv1beta1.KongUpstreamHash{
 						Cookie:     lo.ToPtr("cookie-name"),
 						CookiePath: lo.ToPtr("/"),
 					},
@@ -222,47 +222,47 @@ func TestCRDValidations(t *testing.T) {
 			},
 		},
 		{
-			name: "KongUpstreamPolicy - spec.hashOn.cookie is set, spec.hashOn.cookiePath is required",
+			name: "KongUpstreamPolicy - spec.hash.cookie is set, spec.hash.cookiePath is required",
 			scenario: func(ctx context.Context, t *testing.T, ns string) {
 				err := createKongUpstreamPolicy(ctx, ctrlClient, ns, kongv1beta1.KongUpstreamPolicySpec{
-					HashOn: &kongv1beta1.KongUpstreamHash{
+					Hash: &kongv1beta1.KongUpstreamHash{
 						Cookie: lo.ToPtr("cookie-name"),
 					},
 				})
-				require.ErrorContains(t, err, "When spec.hashOn.cookie is set, spec.hashOn.cookiePath is required.")
+				require.ErrorContains(t, err, "When spec.hash.cookie is set, spec.hash.cookiePath is required.")
 			},
 		},
 		{
-			name: "KongUpstreamPolicy - spec.hashOn.cookiePath is set, spec.hashOn.cookie is required",
+			name: "KongUpstreamPolicy - spec.hash.cookiePath is set, spec.hash.cookie is required",
 			scenario: func(ctx context.Context, t *testing.T, ns string) {
 				err := createKongUpstreamPolicy(ctx, ctrlClient, ns, kongv1beta1.KongUpstreamPolicySpec{
-					HashOn: &kongv1beta1.KongUpstreamHash{
+					Hash: &kongv1beta1.KongUpstreamHash{
 						CookiePath: lo.ToPtr("/"),
 					},
 				})
-				require.ErrorContains(t, err, "When spec.hashOn.cookiePath is set, spec.hashOn.cookie is required.")
+				require.ErrorContains(t, err, "When spec.hash.cookiePath is set, spec.hash.cookie is required.")
 			},
 		},
 		{
-			name: "KongUpstreamPolicy - spec.hashOnFallback.cookie must not be set",
+			name: "KongUpstreamPolicy - spec.hashFallback.cookie must not be set",
 			scenario: func(ctx context.Context, t *testing.T, ns string) {
 				err := createKongUpstreamPolicy(ctx, ctrlClient, ns, kongv1beta1.KongUpstreamPolicySpec{
-					HashOnFallback: &kongv1beta1.KongUpstreamHash{
+					HashFallback: &kongv1beta1.KongUpstreamHash{
 						CookiePath: lo.ToPtr("/"),
 					},
 				})
-				require.ErrorContains(t, err, "spec.hashOnFallback.cookiePath must not be set.")
+				require.ErrorContains(t, err, "spec.hashFallback.cookiePath must not be set.")
 			},
 		},
 		{
-			name: "KongUpstreamPolicy - spec.hashOnFallback.cookiePath must not be set",
+			name: "KongUpstreamPolicy - spec.hashFallback.cookiePath must not be set",
 			scenario: func(ctx context.Context, t *testing.T, ns string) {
 				err := createKongUpstreamPolicy(ctx, ctrlClient, ns, kongv1beta1.KongUpstreamPolicySpec{
-					HashOnFallback: &kongv1beta1.KongUpstreamHash{
+					HashFallback: &kongv1beta1.KongUpstreamHash{
 						CookiePath: lo.ToPtr("/"),
 					},
 				})
-				require.ErrorContains(t, err, "spec.hashOnFallback.cookiePath must not be set.")
+				require.ErrorContains(t, err, "spec.hashFallback.cookiePath must not be set.")
 			},
 		},
 		{
@@ -323,6 +323,15 @@ func TestCRDValidations(t *testing.T) {
 					},
 				})
 				require.ErrorContains(t, err, "spec.healthchecks.passive.unhealthy.interval must not be set.")
+			},
+		},
+		{
+			name: "KongUpstreamPolicy - hash.header is required when hashOn is set to 'header'",
+			scenario: func(ctx context.Context, t *testing.T, ns string) {
+				err := createKongUpstreamPolicy(ctx, ctrlClient, ns, kongv1beta1.KongUpstreamPolicySpec{
+					HashOn: lo.ToPtr("header"),
+				})
+				require.ErrorContains(t, err, `spec.hash.header must to be set when spec.hashOn is set to "header".`)
 			},
 		},
 	}
@@ -420,8 +429,8 @@ func createKongUpstreamPolicy(ctx context.Context, client client.Client, ns stri
 	})
 }
 
-// generateInvalidHashOns generates a list of KongUpstreamHash objects with all possible invalid fields pairs.
-func generateInvalidHashOns() []kongv1beta1.KongUpstreamHash {
+// generateInvalidHashs generates a list of KongUpstreamHash objects with all possible invalid fields pairs.
+func generateInvalidHashs() []kongv1beta1.KongUpstreamHash {
 	fieldSetFns := []func(h *kongv1beta1.KongUpstreamHash){
 		func(h *kongv1beta1.KongUpstreamHash) {
 			h.Cookie = lo.ToPtr("cookie-name")
@@ -438,18 +447,18 @@ func generateInvalidHashOns() []kongv1beta1.KongUpstreamHash {
 		},
 	}
 
-	var invalidHashOns []kongv1beta1.KongUpstreamHash
+	var invalidHashs []kongv1beta1.KongUpstreamHash
 	for outerIdx, fieldSetFn := range fieldSetFns {
-		hashOn := kongv1beta1.KongUpstreamHash{}
-		fieldSetFn(&hashOn)
+		hash := kongv1beta1.KongUpstreamHash{}
+		fieldSetFn(&hash)
 
 		for innerIdx, innerFieldSetFn := range fieldSetFns {
 			if outerIdx == innerIdx {
 				continue
 			}
-			invalidHashOn := hashOn.DeepCopy()
-			innerFieldSetFn(invalidHashOn)
-			invalidHashOns = append(invalidHashOns, *invalidHashOn)
+			invalidHash := hash.DeepCopy()
+			innerFieldSetFn(invalidHash)
+			invalidHashs = append(invalidHashs, *invalidHash)
 		}
 	}
 
@@ -459,7 +468,7 @@ func generateInvalidHashOns() []kongv1beta1.KongUpstreamHash {
 		}
 		return *s
 	}
-	return lo.UniqBy(invalidHashOns, func(h kongv1beta1.KongUpstreamHash) string {
+	return lo.UniqBy(invalidHashs, func(h kongv1beta1.KongUpstreamHash) string {
 		return fmt.Sprintf("%s.%s.%s.%s", optStr(h.Cookie), optStr(h.Header), optStr(h.URICapture), optStr(h.QueryArg))
 	})
 }

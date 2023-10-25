@@ -463,18 +463,23 @@ func (in *KongUpstreamPolicySpec) DeepCopyInto(out *KongUpstreamPolicySpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.HashOn != nil {
+		in, out := &in.HashOn, &out.HashOn
+		*out = new(string)
+		**out = **in
+	}
 	if in.Slots != nil {
 		in, out := &in.Slots, &out.Slots
 		*out = new(int)
 		**out = **in
 	}
-	if in.HashOn != nil {
-		in, out := &in.HashOn, &out.HashOn
+	if in.Hash != nil {
+		in, out := &in.Hash, &out.Hash
 		*out = new(KongUpstreamHash)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.HashOnFallback != nil {
-		in, out := &in.HashOnFallback, &out.HashOnFallback
+	if in.HashFallback != nil {
+		in, out := &in.HashFallback, &out.HashFallback
 		*out = new(KongUpstreamHash)
 		(*in).DeepCopyInto(*out)
 	}

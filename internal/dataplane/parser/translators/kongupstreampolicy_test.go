@@ -33,10 +33,10 @@ func TestTranslateKongUpstreamPolicy(t *testing.T) {
 		{
 			name: "KongUpstreamPolicySpec with hash-on header",
 			policySpec: kongv1beta1.KongUpstreamPolicySpec{
-				HashOn: &kongv1beta1.KongUpstreamHash{
+				Hash: &kongv1beta1.KongUpstreamHash{
 					Header: lo.ToPtr("foo"),
 				},
-				HashOnFallback: &kongv1beta1.KongUpstreamHash{
+				HashFallback: &kongv1beta1.KongUpstreamHash{
 					Header: lo.ToPtr("bar"),
 				},
 			},
@@ -50,7 +50,7 @@ func TestTranslateKongUpstreamPolicy(t *testing.T) {
 		{
 			name: "KongUpstreamPolicySpec with hash-on cookie",
 			policySpec: kongv1beta1.KongUpstreamPolicySpec{
-				HashOn: &kongv1beta1.KongUpstreamHash{
+				Hash: &kongv1beta1.KongUpstreamHash{
 					Cookie:     lo.ToPtr("foo"),
 					CookiePath: lo.ToPtr("/"),
 				},
@@ -64,7 +64,7 @@ func TestTranslateKongUpstreamPolicy(t *testing.T) {
 		{
 			name: "KongUpstreamPolicySpec with hash-on query-arg",
 			policySpec: kongv1beta1.KongUpstreamPolicySpec{
-				HashOn: &kongv1beta1.KongUpstreamHash{
+				Hash: &kongv1beta1.KongUpstreamHash{
 					QueryArg: lo.ToPtr("foo"),
 				},
 			},
@@ -76,7 +76,7 @@ func TestTranslateKongUpstreamPolicy(t *testing.T) {
 		{
 			name: "KongUpstreamPolicySpec with hash-on uri-capture",
 			policySpec: kongv1beta1.KongUpstreamPolicySpec{
-				HashOn: &kongv1beta1.KongUpstreamHash{
+				Hash: &kongv1beta1.KongUpstreamHash{
 					URICapture: lo.ToPtr("foo"),
 				},
 			},

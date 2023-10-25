@@ -599,9 +599,10 @@ KongUpstreamPolicySpec contains the specification for KongUpstreamPolicy.
 | Field | Description |
 | --- | --- |
 | `algorithm` _string_ | Algorithm is the load balancing algorithm to use. Accepted values are: "round-robin", "consistent-hashing", "least-connections", "latency". |
+| `hashOn` _string_ | HashOn defines what to use as hashing input. Using "none" results in a weighted-round-robin scheme with no hashing. Accepted values are: "none", "consumer", "ip", "header", "cookie", "path", "query_arg", "uri_capture". |
 | `slots` _integer_ | Slots is the number of slots in the load balancer algorithm. If not set, the default value in Kong for the algorithm is used. |
-| `hashOn` _[KongUpstreamHash](#kongupstreamhash)_ | HashOn defines how to calculate hash for consistent-hashing load balancing algorithm. Algorithm must be set to "consistent-hashing" for this field to have effect. |
-| `hashOnFallback` _[KongUpstreamHash](#kongupstreamhash)_ | HashOnFallback defines how to calculate hash for consistent-hashing load balancing algorithm if the primary hash function fails. Algorithm must be set to "consistent-hashing" for this field to have effect. |
+| `hash` _[KongUpstreamHash](#kongupstreamhash)_ | Hash defines how to calculate hash for consistent-hashing load balancing algorithm. Algorithm must be set to "consistent-hashing" for this field to have effect. |
+| `hashFallback` _[KongUpstreamHash](#kongupstreamhash)_ | HashFallback defines how to calculate hash for consistent-hashing load balancing algorithm if the primary hash function fails. Algorithm must be set to "consistent-hashing" for this field to have effect. |
 | `healthchecks` _[KongUpstreamHealthcheck](#kongupstreamhealthcheck)_ | Healthchecks defines the health check configurations in Kong. |
 | `hostHeader` _string_ | HostHeader is the hostname to be used as Host header when proxying requests through Kong. |
 

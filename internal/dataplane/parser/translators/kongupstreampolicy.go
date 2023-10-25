@@ -23,17 +23,17 @@ func TranslateKongUpstreamPolicy(policy kongv1beta1.KongUpstreamPolicySpec) *kon
 		Healthchecks: translateHealthchecks(policy.Healthchecks),
 		HostHeader:   policy.HostHeader,
 
-		HashOn:           translateHash(policy.Hash),
-		HashOnHeader:     translateHashHeader(policy.Hash),
-		HashOnURICapture: translateHashURICapture(policy.Hash),
-		HashOnCookie:     translateHashCookie(policy.Hash),
-		HashOnCookiePath: translateHashCookiePath(policy.Hash),
-		HashOnQueryArg:   translateHashQueryArg(policy.Hash),
+		HashOn:           translateHash(policy.HashOn),
+		HashOnHeader:     translateHashHeader(policy.HashOn),
+		HashOnURICapture: translateHashURICapture(policy.HashOn),
+		HashOnCookie:     translateHashCookie(policy.HashOn),
+		HashOnCookiePath: translateHashCookiePath(policy.HashOn),
+		HashOnQueryArg:   translateHashQueryArg(policy.HashOn),
 
-		HashFallback:           translateHash(policy.HashFallback),
-		HashFallbackHeader:     translateHashHeader(policy.HashFallback),
-		HashFallbackURICapture: translateHashURICapture(policy.HashFallback),
-		HashFallbackQueryArg:   translateHashQueryArg(policy.HashFallback),
+		HashFallback:           translateHash(policy.HashOnFallback),
+		HashFallbackHeader:     translateHashHeader(policy.HashOnFallback),
+		HashFallbackURICapture: translateHashURICapture(policy.HashOnFallback),
+		HashFallbackQueryArg:   translateHashQueryArg(policy.HashOnFallback),
 	}
 }
 
@@ -43,6 +43,8 @@ func translateHash(hashOn *kongv1beta1.KongUpstreamHash) *string {
 	}
 	// CRD validations will ensure only one of hashOn fields can be set, therefore the order doesn't matter.
 	switch {
+	case hashOn.Input != nil:
+		return lo.ToPtr(string(*hashOn.Input))
 	case hashOn.Header != nil:
 		return lo.ToPtr(KongHashTypeHeader)
 	case hashOn.Cookie != nil:

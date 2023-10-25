@@ -66,7 +66,7 @@ spec:
                 - least-connections
                 - latency
                 type: string
-              hash:
+              hashOn:
                 description: Hash defines how to calculate hash for consistent-hashing
                   load balancing algorithm. Algorithm must be set to "consistent-hashing"
                   for this field to have effect.
@@ -81,6 +81,15 @@ spec:
                   header:
                     description: Header is the name of the header to use as hash input.
                     type: string
+                  input:
+                    description: Input allows using one of the predefined inputs (ip,
+                      consumer, path). For other parametrized inputs, use one of the
+                      fields below.
+                    enum:
+                    - ip
+                    - consumer
+                    - path
+                    type: string
                   queryArg:
                     description: QueryArg is the name of the query argument to use
                       as hash input.
@@ -90,7 +99,7 @@ spec:
                       use as hash input.
                     type: string
                 type: object
-              hashFallback:
+              hashOnFallback:
                 description: HashFallback defines how to calculate hash for consistent-hashing
                   load balancing algorithm if the primary hash function fails. Algorithm
                   must be set to "consistent-hashing" for this field to have effect.
@@ -105,6 +114,15 @@ spec:
                   header:
                     description: Header is the name of the header to use as hash input.
                     type: string
+                  input:
+                    description: Input allows using one of the predefined inputs (ip,
+                      consumer, path). For other parametrized inputs, use one of the
+                      fields below.
+                    enum:
+                    - ip
+                    - consumer
+                    - path
+                    type: string
                   queryArg:
                     description: QueryArg is the name of the query argument to use
                       as hash input.
@@ -114,21 +132,6 @@ spec:
                       use as hash input.
                     type: string
                 type: object
-              hashOn:
-                description: 'HashOn defines what to use as hashing input. Using "none"
-                  results in a weighted-round-robin scheme with no hashing. Accepted
-                  values are: "none", "consumer", "ip", "header", "cookie", "path",
-                  "query_arg", "uri_capture".'
-                enum:
-                - none
-                - consumer
-                - ip
-                - header
-                - cookie
-                - path
-                - query_arg
-                - uri_capture
-                type: string
               healthchecks:
                 description: Healthchecks defines the health check configurations
                   in Kong.
@@ -333,30 +336,28 @@ spec:
             type: object
         type: object
         x-kubernetes-validations:
-        - message: spec.hash.header is required when spec.hashOn is set to "header".
-          rule: 'has(self.spec.hashOn) && self.spec.hashOn == "header" ? has(self.spec.hashHeader)
-            : true'
-        - message: Only one of spec.hash.(cookie|header|uriCapture|queryArg) can be
-            set.
-          rule: 'has(self.spec.hash) ? [has(self.spec.hash.cookie), has(self.spec.hash.header),
-            has(self.spec.hash.uriCapture), has(self.spec.hash.queryArg)].filter(fieldSet,
+        - message: Only one of spec.hashOn.(input|cookie|header|uriCapture|queryArg)
+            can be set.
+          rule: 'has(self.spec.hashOn) ? [has(self.spec.hashOn.input), has(self.spec.hashOn.cookie),
+            has(self.spec.hashOn.header), has(self.spec.hashOn.uriCapture), has(self.spec.hashOn.queryArg)].filter(fieldSet,
             fieldSet == true).size() <= 1 : true'
-        - message: Only one of spec.hashFallback.(header|uriCapture|queryArg) can
-            be set.
-          rule: 'has(self.spec.hashFallback) ? [has(self.spec.hashFallback.header),
-            has(self.spec.hashFallback.uriCapture), has(self.spec.hashFallback.queryArg)].filter(fieldSet,
-            fieldSet == true).size() <= 1 : true'
-        - message: When spec.hash.cookie is set, spec.hash.cookiePath is required.
-          rule: 'has(self.spec.hash) && has(self.spec.hash.cookie) ? has(self.spec.hash.cookiePath)
+        - message: Only one of spec.hashOnFallback.(input|header|uriCapture|queryArg)
+            can be set.
+          rule: 'has(self.spec.hashOnFallback) ? [has(self.spec.hashOnFallback.input),
+            has(self.spec.hashOnFallback.header), has(self.spec.hashOnFallback.uriCapture),
+            has(self.spec.hashOnFallback.queryArg)].filter(fieldSet, fieldSet == true).size()
+            <= 1 : true'
+        - message: When spec.hashOn.cookie is set, spec.hashOn.cookiePath is required.
+          rule: 'has(self.spec.hashOn) && has(self.spec.hashOn.cookie) ? has(self.spec.hashOn.cookiePath)
             : true'
-        - message: When spec.hash.cookiePath is set, spec.hash.cookie is required.
-          rule: 'has(self.spec.hash) && has(self.spec.hash.cookiePath) ? has(self.spec.hash.cookie)
+        - message: When spec.hashOn.cookiePath is set, spec.hashOn.cookie is required.
+          rule: 'has(self.spec.hashOn) && has(self.spec.hashOn.cookiePath) ? has(self.spec.hashOn.cookie)
             : true'
-        - message: spec.hashFallback.cookie must not be set.
-          rule: 'has(self.spec.hashFallback) ? !has(self.spec.hashFallback.cookie)
+        - message: spec.hashOnFallback.cookie must not be set.
+          rule: 'has(self.spec.hashOnFallback) ? !has(self.spec.hashOnFallback.cookie)
             : true'
-        - message: spec.hashFallback.cookiePath must not be set.
-          rule: 'has(self.spec.hashFallback) ? !has(self.spec.hashFallback.cookiePath)
+        - message: spec.hashOnFallback.cookiePath must not be set.
+          rule: 'has(self.spec.hashOnFallback) ? !has(self.spec.hashOnFallback.cookiePath)
             : true'
         - message: spec.healthchecks.passive.healthy.interval must not be set.
           rule: 'has(self.spec.healthchecks) && has(self.spec.healthchecks.passive)
@@ -366,6 +367,14 @@ spec:
           rule: 'has(self.spec.healthchecks) && has(self.spec.healthchecks.passive)
             && has(self.spec.healthchecks.passive.unhealthy) ? !has(self.spec.healthchecks.passive.unhealthy.interval)
             : true'
+        - message: spec.algorithm must be set to "consistent-hashing" when spec.hashOn
+            is set.
+          rule: 'has(self.spec.hashOn) ? has(self.spec.algorithm) && self.spec.algorithm
+            == "consistent-hashing" : true'
+        - message: spec.algorithm must be set to "consistent-hashing" when spec.hashOnFallback
+            is set.
+          rule: 'has(self.spec.hashOnFallback) ? has(self.spec.algorithm) && self.spec.algorithm
+            == "consistent-hashing" : true'
     served: true
     storage: true
     subresources:

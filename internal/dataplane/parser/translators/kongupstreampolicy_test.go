@@ -33,10 +33,10 @@ func TestTranslateKongUpstreamPolicy(t *testing.T) {
 		{
 			name: "KongUpstreamPolicySpec with hash-on header",
 			policySpec: kongv1beta1.KongUpstreamPolicySpec{
-				Hash: &kongv1beta1.KongUpstreamHash{
+				HashOn: &kongv1beta1.KongUpstreamHash{
 					Header: lo.ToPtr("foo"),
 				},
-				HashFallback: &kongv1beta1.KongUpstreamHash{
+				HashOnFallback: &kongv1beta1.KongUpstreamHash{
 					Header: lo.ToPtr("bar"),
 				},
 			},
@@ -50,7 +50,7 @@ func TestTranslateKongUpstreamPolicy(t *testing.T) {
 		{
 			name: "KongUpstreamPolicySpec with hash-on cookie",
 			policySpec: kongv1beta1.KongUpstreamPolicySpec{
-				Hash: &kongv1beta1.KongUpstreamHash{
+				HashOn: &kongv1beta1.KongUpstreamHash{
 					Cookie:     lo.ToPtr("foo"),
 					CookiePath: lo.ToPtr("/"),
 				},
@@ -64,7 +64,7 @@ func TestTranslateKongUpstreamPolicy(t *testing.T) {
 		{
 			name: "KongUpstreamPolicySpec with hash-on query-arg",
 			policySpec: kongv1beta1.KongUpstreamPolicySpec{
-				Hash: &kongv1beta1.KongUpstreamHash{
+				HashOn: &kongv1beta1.KongUpstreamHash{
 					QueryArg: lo.ToPtr("foo"),
 				},
 			},
@@ -76,13 +76,28 @@ func TestTranslateKongUpstreamPolicy(t *testing.T) {
 		{
 			name: "KongUpstreamPolicySpec with hash-on uri-capture",
 			policySpec: kongv1beta1.KongUpstreamPolicySpec{
-				Hash: &kongv1beta1.KongUpstreamHash{
+				HashOn: &kongv1beta1.KongUpstreamHash{
 					URICapture: lo.ToPtr("foo"),
 				},
 			},
 			expectedUpstream: &kong.Upstream{
 				HashOn:           lo.ToPtr("uri_capture"),
 				HashOnURICapture: lo.ToPtr("foo"),
+			},
+		},
+		{
+			name: "KongUpstreamPolicySpec with predefined hash input",
+			policySpec: kongv1beta1.KongUpstreamPolicySpec{
+				HashOn: &kongv1beta1.KongUpstreamHash{
+					Input: lo.ToPtr(kongv1beta1.HashInput("consumer")),
+				},
+				HashOnFallback: &kongv1beta1.KongUpstreamHash{
+					Input: lo.ToPtr(kongv1beta1.HashInput("ip")),
+				},
+			},
+			expectedUpstream: &kong.Upstream{
+				HashOn:       lo.ToPtr("consumer"),
+				HashFallback: lo.ToPtr("ip"),
 			},
 		},
 		{

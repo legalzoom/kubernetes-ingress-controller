@@ -34,15 +34,16 @@ func init() {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 // +kubebuilder:metadata:labels=gateway.networking.k8s.io/policy=direct
-// +kubebuilder:validation:XValidation:rule="has(self.spec.hashOn) && self.spec.hashOn == \"header\" ? has(self.spec.hashHeader) : true", message="spec.hash.header is required when spec.hashOn is set to \"header\"."
-// +kubebuilder:validation:XValidation:rule="has(self.spec.hash) ? [has(self.spec.hash.cookie), has(self.spec.hash.header), has(self.spec.hash.uriCapture), has(self.spec.hash.queryArg)].filter(fieldSet, fieldSet == true).size() <= 1 : true", message="Only one of spec.hash.(cookie|header|uriCapture|queryArg) can be set."
-// +kubebuilder:validation:XValidation:rule="has(self.spec.hashFallback) ? [has(self.spec.hashFallback.header), has(self.spec.hashFallback.uriCapture), has(self.spec.hashFallback.queryArg)].filter(fieldSet, fieldSet == true).size() <= 1 : true", message="Only one of spec.hashFallback.(header|uriCapture|queryArg) can be set."
-// +kubebuilder:validation:XValidation:rule="has(self.spec.hash) && has(self.spec.hash.cookie) ? has(self.spec.hash.cookiePath) : true", message="When spec.hash.cookie is set, spec.hash.cookiePath is required."
-// +kubebuilder:validation:XValidation:rule="has(self.spec.hash) && has(self.spec.hash.cookiePath) ? has(self.spec.hash.cookie) : true", message="When spec.hash.cookiePath is set, spec.hash.cookie is required."
-// +kubebuilder:validation:XValidation:rule="has(self.spec.hashFallback) ? !has(self.spec.hashFallback.cookie) : true", message="spec.hashFallback.cookie must not be set."
-// +kubebuilder:validation:XValidation:rule="has(self.spec.hashFallback) ? !has(self.spec.hashFallback.cookiePath) : true", message="spec.hashFallback.cookiePath must not be set."
+// +kubebuilder:validation:XValidation:rule="has(self.spec.hashOn) ? [has(self.spec.hashOn.input), has(self.spec.hashOn.cookie), has(self.spec.hashOn.header), has(self.spec.hashOn.uriCapture), has(self.spec.hashOn.queryArg)].filter(fieldSet, fieldSet == true).size() <= 1 : true", message="Only one of spec.hashOn.(input|cookie|header|uriCapture|queryArg) can be set."
+// +kubebuilder:validation:XValidation:rule="has(self.spec.hashOnFallback) ? [has(self.spec.hashOnFallback.input), has(self.spec.hashOnFallback.header), has(self.spec.hashOnFallback.uriCapture), has(self.spec.hashOnFallback.queryArg)].filter(fieldSet, fieldSet == true).size() <= 1 : true", message="Only one of spec.hashOnFallback.(input|header|uriCapture|queryArg) can be set."
+// +kubebuilder:validation:XValidation:rule="has(self.spec.hashOn) && has(self.spec.hashOn.cookie) ? has(self.spec.hashOn.cookiePath) : true", message="When spec.hashOn.cookie is set, spec.hashOn.cookiePath is required."
+// +kubebuilder:validation:XValidation:rule="has(self.spec.hashOn) && has(self.spec.hashOn.cookiePath) ? has(self.spec.hashOn.cookie) : true", message="When spec.hashOn.cookiePath is set, spec.hashOn.cookie is required."
+// +kubebuilder:validation:XValidation:rule="has(self.spec.hashOnFallback) ? !has(self.spec.hashOnFallback.cookie) : true", message="spec.hashOnFallback.cookie must not be set."
+// +kubebuilder:validation:XValidation:rule="has(self.spec.hashOnFallback) ? !has(self.spec.hashOnFallback.cookiePath) : true", message="spec.hashOnFallback.cookiePath must not be set."
 // +kubebuilder:validation:XValidation:rule="has(self.spec.healthchecks) && has(self.spec.healthchecks.passive) && has(self.spec.healthchecks.passive.healthy) ? !has(self.spec.healthchecks.passive.healthy.interval) : true", message="spec.healthchecks.passive.healthy.interval must not be set."
 // +kubebuilder:validation:XValidation:rule="has(self.spec.healthchecks) && has(self.spec.healthchecks.passive) && has(self.spec.healthchecks.passive.unhealthy) ? !has(self.spec.healthchecks.passive.unhealthy.interval) : true", message="spec.healthchecks.passive.unhealthy.interval must not be set."
+// +kubebuilder:validation:XValidation:rule="has(self.spec.hashOn) ? has(self.spec.algorithm) && self.spec.algorithm == \"consistent-hashing\" : true", message="spec.algorithm must be set to \"consistent-hashing\" when spec.hashOn is set."
+// +kubebuilder:validation:XValidation:rule="has(self.spec.hashOnFallback) ? has(self.spec.algorithm) && self.spec.algorithm == \"consistent-hashing\" : true", message="spec.algorithm must be set to \"consistent-hashing\" when spec.hashOnFallback is set."
 type KongUpstreamPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -69,11 +70,6 @@ type KongUpstreamPolicySpec struct {
 	// +kubebuilder:validation:Enum=round-robin;consistent-hashing;least-connections;latency
 	Algorithm *string `json:"algorithm,omitempty"`
 
-	// HashOn defines what to use as hashing input. Using "none" results in a weighted-round-robin scheme with no hashing.
-	// Accepted values are: "none", "consumer", "ip", "header", "cookie", "path", "query_arg", "uri_capture".
-	// +kubebuilder:validation:Enum=none;consumer;ip;header;cookie;path;query_arg;uri_capture
-	HashOn *string `json:"hashOn,omitempty"`
-
 	// Slots is the number of slots in the load balancer algorithm.
 	// If not set, the default value in Kong for the algorithm is used.
 	// +kubebuilder:validation:Minimum=10
@@ -82,12 +78,12 @@ type KongUpstreamPolicySpec struct {
 
 	// Hash defines how to calculate hash for consistent-hashing load balancing algorithm.
 	// Algorithm must be set to "consistent-hashing" for this field to have effect.
-	Hash *KongUpstreamHash `json:"hash,omitempty"`
+	HashOn *KongUpstreamHash `json:"hashOn,omitempty"`
 
 	// HashFallback defines how to calculate hash for consistent-hashing load balancing algorithm if the primary hash
 	// function fails.
 	// Algorithm must be set to "consistent-hashing" for this field to have effect.
-	HashFallback *KongUpstreamHash `json:"hashFallback,omitempty"`
+	HashOnFallback *KongUpstreamHash `json:"hashOnFallback,omitempty"`
 
 	// Healthchecks defines the health check configurations in Kong.
 	Healthchecks *KongUpstreamHealthcheck `json:"healthchecks,omitempty"`
@@ -96,9 +92,18 @@ type KongUpstreamPolicySpec struct {
 	HostHeader *string `json:"hostHeader,omitempty"`
 }
 
+// HashInput is the input for consistent-hashing load balancing algorithm.
+// Can be one of: "ip", "consumer", "path".
+// +kubebuilder:validation:Enum=ip;consumer;path
+type HashInput string
+
 // KongUpstreamHash defines how to calculate hash for consistent-hashing load balancing algorithm.
 // Only one of the fields must be set.
 type KongUpstreamHash struct {
+	// Input allows using one of the predefined inputs (ip, consumer, path).
+	// For other parametrized inputs, use one of the fields below.
+	Input *HashInput `json:"input,omitempty"`
+
 	// Header is the name of the header to use as hash input.
 	Header *string `json:"header,omitempty"`
 

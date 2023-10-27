@@ -74,10 +74,23 @@ func (r *KongAdminAPIServiceReconciler) SetupWithManager(mgr ctrl.Manager) error
 		r.Cache = make(DiscoveredAdminAPIsCache)
 	}
 
+	serviceNameLabelSelectorPreficate, err := predicate.LabelSelectorPredicate(
+		metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"kubernetes.io/service-name": r.ServiceNN.Name,
+			},
+		})
+	if err != nil {
+		return fmt.Errorf("failed to create label selector predicate: %w", err)
+	}
+
 	return c.Watch(
 		source.Kind(mgr.GetCache(), &discoveryv1.EndpointSlice{}),
 		&handler.EnqueueRequestForObject{},
-		predicate.NewPredicateFuncs(r.shouldReconcileEndpointSlice),
+		predicate.And(
+			serviceNameLabelSelectorPreficate,
+			predicate.NewPredicateFuncs(r.shouldReconcileEndpointSlice),
+		),
 	)
 }
 
@@ -92,16 +105,29 @@ func (r *KongAdminAPIServiceReconciler) shouldReconcileEndpointSlice(obj client.
 		return false
 	}
 
+	l := r.Log.V(util.DebugLevel).WithValues(
+		"type", "Admin API EndpointSlice", "namespace", endpoints.Namespace, "name", endpoints.Name,
+	)
+
 	if endpoints.Namespace != r.ServiceNN.Namespace {
+		l.Info("Admin API EndpointSlice should not be reconciled, namespace mismatch",
+			"admin_api_namespace", r.ServiceNN.Namespace,
+			"endpoint_slice_namespace", endpoints.Namespace,
+		)
 		return false
 	}
 
 	if !lo.ContainsBy(endpoints.OwnerReferences, func(ref metav1.OwnerReference) bool {
 		return ref.Kind == "Service" && ref.Name == r.ServiceNN.Name
 	}) {
+		l.Info("Admin API EndpointSlice should not be reconciled, not owned by the configured Admin API Service",
+			"admin_api_namespace", r.ServiceNN.Namespace,
+			"admin_api_name", r.ServiceNN.Name,
+		)
 		return false
 	}
 
+	l.Info("Admin API EndpointSlice should be reconciled")
 	return true
 }
 

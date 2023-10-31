@@ -36,6 +36,7 @@ type KongValidator interface {
 	ValidateGateway(ctx context.Context, gateway gatewayapi.Gateway) (bool, string, error)
 	ValidateHTTPRoute(ctx context.Context, httproute gatewayapi.HTTPRoute) (bool, string, error)
 	ValidateIngress(ctx context.Context, ingress netv1.Ingress) (bool, string, error)
+	ValidateUpstreamPolicy(ctx context.Context, policy kongv1beta1.KongUpstreamPolicy) (bool, string, error)
 }
 
 // AdminAPIServicesProvider provides KongHTTPValidator with Kong Admin API services that are needed to perform

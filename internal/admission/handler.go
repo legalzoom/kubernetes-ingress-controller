@@ -85,6 +85,11 @@ var (
 		Version:  kongv1.SchemeGroupVersion.Version,
 		Resource: "kongingresses",
 	}
+	kongUpstreamPolicyGVResource = metav1.GroupVersionResource{
+		Group:    kongv1beta1.SchemeGroupVersion.Group,
+		Version:  kongv1beta1.SchemeGroupVersion.Version,
+		Resource: "kongupstreampolicies",
+	}
 	secretGVResource = metav1.GroupVersionResource{
 		Group:    corev1.SchemeGroupVersion.Group,
 		Version:  corev1.SchemeGroupVersion.Version,
@@ -121,6 +126,8 @@ func (h RequestHandler) handleValidation(ctx context.Context, request admissionv
 		return h.handleKongIngress(ctx, request, responseBuilder)
 	case ingressGVResource:
 		return h.handleIngress(ctx, request, responseBuilder)
+	case kongUpstreamPolicyGVResource:
+		return h.handleKongUpstreamPolicy(ctx, request, responseBuilder)
 	default:
 		return nil, fmt.Errorf("unknown resource type to validate: %s/%s %s",
 			request.Resource.Group, request.Resource.Version,
@@ -324,4 +331,18 @@ func (h RequestHandler) handleIngress(ctx context.Context, request admissionv1.A
 	}
 
 	return responseBuilder.Allowed(ok).WithMessage(message).Build(), nil
+}
+
+func (h RequestHandler) handleKongUpstreamPolicy(ctx context.Context, request admissionv1.AdmissionRequest, builder *ResponseBuilder) (*admissionv1.AdmissionResponse, error) {
+	upstreamPolicy := kongv1beta1.KongUpstreamPolicy{}
+	_, _, err := codecs.UniversalDeserializer().Decode(request.Object.Raw, nil, &upstreamPolicy)
+	if err != nil {
+		return nil, err
+	}
+	ok, message, err := h.Validator.ValidateUpstreamPolicy(ctx, upstreamPolicy)
+	if err != nil {
+		return nil, err
+	}
+
+	return builder.Allowed(ok).WithMessage(message).Build(), nil
 }

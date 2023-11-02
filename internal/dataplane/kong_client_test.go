@@ -873,3 +873,46 @@ func TestKongClientUpdate_FetchStoreAndPushLastValidConfig(t *testing.T) {
 		})
 	}
 }
+
+type mockStatusQueue struct {
+	notifications []client.Object
+}
+
+func (s mockStatusQueue) Publish(obj client.Object) {
+	s.notifications = append(s.notifications, obj)
+}
+
+func TestKongClientUpdate_OnConfigChangeStatusQueueIsNotified(t *testing.T) {
+	var (
+		ctx = context.Background()
+
+		clientsProvider = mockGatewayClientsProvider{
+			gatewayClients: []*adminapi.Client{
+				mustSampleGatewayClient(t),
+				mustSampleGatewayClient(t),
+			},
+		}
+
+		configBuilder          = newMockKongConfigBuilder()
+		updateStrategyResolver = newMockUpdateStrategyResolver(t)
+		configChangeDetector   = mockConfigurationChangeDetector{hasConfigurationChanged: true}
+	)
+
+	kongRawStateGetter := &mockKongLastValidConfigFetcher{
+		status: configChangeDetector.status,
+	}
+	kongClient := setupTestKongClient(
+		t,
+		updateStrategyResolver,
+		clientsProvider,
+		configChangeDetector,
+		configBuilder,
+		nil,
+		kongRawStateGetter,
+	)
+	statusQueue := &mockStatusQueue{}
+	kongClient.EnableKubernetesObjectReports(statusQueue)
+
+	err := kongClient.Update(ctx)
+	require.NoError(t, err)
+}

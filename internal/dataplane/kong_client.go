@@ -1,11 +1,11 @@
 package dataplane
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"reflect"
-	"sort"
 	"sync"
 	"time"
 
@@ -15,7 +15,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/samber/mo"
 	"github.com/sourcegraph/conc/iter"
-	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +35,6 @@ import (
 	"github.com/kong/kubernetes-ingress-controller/v3/internal/util"
 	dataplaneutil "github.com/kong/kubernetes-ingress-controller/v3/internal/util/dataplane"
 	k8sobj "github.com/kong/kubernetes-ingress-controller/v3/internal/util/kubernetes/object"
-	"github.com/kong/kubernetes-ingress-controller/v3/internal/util/kubernetes/object/status"
 )
 
 const (
@@ -55,6 +53,10 @@ const (
 // KongConfigBuilder builds a Kong configuration from a Kubernetes object cache.
 type KongConfigBuilder interface {
 	BuildKongConfig() parser.KongConfigBuildingResult
+}
+
+type StatusQueue interface {
+	Publish(obj client.Object)
 }
 
 // KongClient is a threadsafe high level API client for the Kong data-plane(s)
@@ -97,7 +99,7 @@ type KongClient struct {
 	// to the data-plane: messages will trigger reconciliation in the control plane
 	// so that status for the objects can be updated accordingly. This is only in
 	// use when kubernetesObjectReportsEnabled is true.
-	kubernetesObjectStatusQueue *status.Queue
+	kubernetesObjectStatusQueue StatusQueue
 
 	// kubernetesObjectReportsEnabled indicates whether the data-plane client will
 	// file reports about Kubernetes objects which are successfully configured for
@@ -112,9 +114,6 @@ type KongClient struct {
 
 	// eventRecorder is used to record warning events for resource failures.
 	eventRecorder record.EventRecorder
-
-	// SHAs is a slice is configuration hashes send in last batch send.
-	SHAs []string
 
 	// clientsProvider allows retrieving the most recent set of clients.
 	clientsProvider clients.AdminAPIClientsProvider
@@ -331,7 +330,7 @@ func (c *KongClient) Listeners(ctx context.Context) ([]kong.ProxyListener, []kon
 // configured as part of Update() operations. Enabling this makes it possible to use
 // ObjectConfigured(obj) to determine whether an object has successfully been
 // configured for on the data-plane.
-func (c *KongClient) EnableKubernetesObjectReports(q *status.Queue) {
+func (c *KongClient) EnableKubernetesObjectReports(q StatusQueue) {
 	c.kubernetesObjectReportLock.Lock()
 	defer c.kubernetesObjectReportLock.Unlock()
 	c.kubernetesObjectStatusQueue = q
@@ -408,7 +407,7 @@ func (c *KongClient) Update(ctx context.Context) error {
 		c.logger.V(util.DebugLevel).Info("successfully built data-plane configuration")
 	}
 
-	shas, gatewaysSyncErr := c.sendOutToGatewayClients(ctx, parsingResult.KongState, c.kongConfig)
+	configHasChanged, gatewaysSyncErr := c.sendOutToGatewayClients(ctx, parsingResult.KongState, c.kongConfig)
 	konnectSyncErr := c.maybeSendOutToKonnectClient(ctx, parsingResult.KongState, c.kongConfig)
 
 	// Taking into account the results of syncing configuration with Gateways and Konnect, and potential translation
@@ -437,7 +436,7 @@ func (c *KongClient) Update(ctx context.Context) error {
 	if c.AreKubernetesObjectReportsEnabled() {
 		// if the configuration SHAs that have just been pushed are different than
 		// what's been previously pushed.
-		if !slices.Equal(shas, c.SHAs) {
+		if configHasChanged {
 			c.logger.V(util.DebugLevel).Info("triggering report for configured Kubernetes objects", "count",
 				len(parsingResult.ConfiguredKubernetesObjects))
 			c.triggerKubernetesObjectReport(parsingResult.ConfiguredKubernetesObjects, parsingResult.TranslationFailures)
@@ -452,23 +451,20 @@ func (c *KongClient) Update(ctx context.Context) error {
 // and send it out to each of the configured gateway clients.
 func (c *KongClient) sendOutToGatewayClients(
 	ctx context.Context, s *kongstate.KongState, config sendconfig.Config,
-) ([]string, error) {
+) (configHasChanged bool, err error) {
 	gatewayClients := c.clientsProvider.GatewayClients()
 	c.logger.V(util.DebugLevel).Info("sending configuration to gateway clients", "count", len(gatewayClients))
-	shas, err := iter.MapErr(gatewayClients, func(client **adminapi.Client) (string, error) {
+	haveConfigsChanged, err := iter.MapErr(gatewayClients, func(client **adminapi.Client) (bool, error) {
 		return c.sendToClient(ctx, *client, s, config)
 	})
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	previousSHAs := c.SHAs
-
-	sort.Strings(shas)
-	c.SHAs = shas
 
 	c.kongConfigFetcher.StoreLastValidConfig(s)
 
-	return previousSHAs, nil
+	configHasChanged = lo.Count(haveConfigsChanged, true) > 0
+	return configHasChanged, nil
 }
 
 // maybeSendOutToKonnectClient sends out the configuration to Konnect when KonnectClient is provided.
@@ -500,7 +496,7 @@ func (c *KongClient) sendToClient(
 	client sendconfig.AdminAPIClient,
 	s *kongstate.KongState,
 	config sendconfig.Config,
-) (string, error) {
+) (hasConfigChanged bool, err error) {
 	logger := c.logger.WithValues("url", client.AdminAPIClient().BaseRootURL())
 
 	deckGenParams := deckgen.GenerateDeckContentParams{
@@ -537,13 +533,15 @@ func (c *KongClient) sendToClient(
 		if expired, ok := timedCtx.Deadline(); ok && time.Now().After(expired) {
 			logger.Error(nil, "exceeded Kong API timeout, consider increasing --proxy-timeout-seconds")
 		}
-		return "", fmt.Errorf("performing update for %s failed: %w", client.AdminAPIClient().BaseRootURL(), err)
+		return false, fmt.Errorf("performing update for %s failed: %w", client.AdminAPIClient().BaseRootURL(), err)
 	}
 
-	// update the lastConfigSHA with the new updated checksum
-	client.SetLastConfigSHA(newConfigSHA)
+	hasConfigChanged = bytes.Equal(client.LastConfigSHA(), newConfigSHA)
+	if hasConfigChanged {
+		client.SetLastConfigSHA(newConfigSHA)
+	}
 
-	return string(newConfigSHA), nil
+	return hasConfigChanged, nil
 }
 
 // SetConfigStatusNotifier sets a notifier which notifies subscribers about configuration sending results.

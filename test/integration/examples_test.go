@@ -203,22 +203,33 @@ func TestTLSRouteExample(t *testing.T) {
 	}, ingressWait, waitTick)
 }
 
-func TestGRPCRouteExample(t *testing.T) {
+func TestGRPCRouteExampleViaHTTPS(t *testing.T) {
 	var (
-		grpcrouteExampleManifests = fmt.Sprintf("%s/gateway-grpcroute.yaml", examplesDIR)
+		grpcRouteExampleManifests = fmt.Sprintf("%s/gateway-grpcroute-via-https.yaml", examplesDIR)
 		ctx                       = context.Background()
 	)
-	_, cleaner := helpers.Setup(ctx, t, env)
+	testGRPC(ctx, t, grpcRouteExampleManifests, ktfkong.DefaultProxyTLSServicePort, true)
+}
 
-	t.Logf("applying yaml manifest %s", grpcrouteExampleManifests)
-	b, err := os.ReadFile(grpcrouteExampleManifests)
+func TestGRPCRouteExampleViaHTTP(t *testing.T) {
+	var (
+		grpcRouteExampleManifests = fmt.Sprintf("%s/gateway-grpcroute-via-http.yaml", examplesDIR)
+		ctx                       = context.Background()
+	)
+	testGRPC(ctx, t, grpcRouteExampleManifests, ktfkong.DefaultProxyHTTPPort, false)
+}
+
+func testGRPC(ctx context.Context, t *testing.T, manifestPath string, gatewayPort int, enableTLS bool) {
+	_, cleaner := helpers.Setup(ctx, t, env)
+	t.Logf("applying yaml manifest %s", manifestPath)
+	b, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
 	require.NoError(t, clusters.ApplyManifestByYAML(ctx, env.Cluster(), string(b)))
 	cleaner.AddManifest(string(b))
 
 	t.Log("verifying that GRPCRoute becomes routable")
 	require.Eventually(t, func() bool {
-		err := grpcEchoResponds(ctx, fmt.Sprintf("%s:%d", proxyURL.Hostname(), ktfkong.DefaultProxyTLSServicePort), "example.com", "kong")
+		err := grpcEchoResponds(ctx, fmt.Sprintf("%s:%d", proxyURL.Hostname(), gatewayPort), "example.com", "kong", enableTLS)
 		if err != nil {
 			t.Log(err)
 		}

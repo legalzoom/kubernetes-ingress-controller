@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,15 +31,19 @@ import (
 	"github.com/kong/kubernetes-ingress-controller/v3/test/internal/helpers"
 )
 
-func grpcbinClient(ctx context.Context, url, hostname string) (pb.GRPCBinClient, func() error, error) {
-	conn, err := grpc.DialContext(ctx, url,
-		grpc.WithTransportCredentials(credentials.NewTLS(
+func grpcBinClient(ctx context.Context, url, hostname string, enableTLS bool) (pb.GRPCBinClient, func() error, error) {
+	var opts []grpc.DialOption
+	if enableTLS {
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(
 			&tls.Config{
 				ServerName:         hostname,
 				InsecureSkipVerify: true,
-			},
-		)),
-	)
+			}),
+		))
+	} else {
+		opts = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithAuthority(hostname)}
+	}
+	conn, err := grpc.DialContext(ctx, url, opts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial GRPC server: %w", err)
 	}
@@ -47,8 +52,8 @@ func grpcbinClient(ctx context.Context, url, hostname string) (pb.GRPCBinClient,
 	return client, conn.Close, nil
 }
 
-func grpcEchoResponds(ctx context.Context, url, hostname, input string) error {
-	client, closeConn, err := grpcbinClient(ctx, url, hostname)
+func grpcEchoResponds(ctx context.Context, url, hostname, input string, enableTLS bool) error {
+	client, closeConn, err := grpcBinClient(ctx, url, hostname, enableTLS)
 	if err != nil {
 		return err
 	}
@@ -193,14 +198,14 @@ func TestGRPCRouteEssentials(t *testing.T) {
 	grpcAddr := fmt.Sprintf("%s:%d", proxyURL.Hostname(), ktfkong.DefaultProxyTLSServicePort)
 	t.Log("waiting for routes from GRPCRoute to become operational")
 	require.Eventually(t, func() bool {
-		err := grpcEchoResponds(ctx, grpcAddr, testHostname, "kong")
+		err := grpcEchoResponds(ctx, grpcAddr, testHostname, "kong", true)
 		if err != nil {
 			t.Log(err)
 		}
 		return err == nil
 	}, ingressWait, waitTick)
 
-	client, closeGrpcConn, err := grpcbinClient(ctx, grpcAddr, testHostname)
+	client, closeGrpcConn, err := grpcBinClient(ctx, grpcAddr, testHostname, true)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		err := closeGrpcConn()

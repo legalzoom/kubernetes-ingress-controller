@@ -68,7 +68,7 @@ func TestMain(m *testing.M) {
 	// Pin the Helm chart version.
 	kongbuilder.WithHelmChartVersion(testenv.KongHelmChartVersion())
 
-	kongAddon := kongbuilder.Build()
+	kongAddon := kongbuilder.WithProxyEnvVar("PROXY_LISTEN", `0.0.0.0:8000 http2\, 0.0.0.0:8443 http2 ssl`).Build()
 	builder := environments.NewBuilder().WithAddons(kongAddon)
 
 	fmt.Println("INFO: configuring cluster for testing environment")

@@ -57,6 +57,29 @@ func (t *Translator) ingressRulesFromGRPCRoute(result *ingressRules, grpcroute *
 	// first we grab the spec and gather some metdata about the object
 	spec := grpcroute.Spec
 
+	// var gws sets.Set[k8stypes.NamespacedName]
+	// for _, pr := range spec.ParentRefs {
+	// 	gw := k8stypes.NamespacedName{Namespace: pr.Namespace, Name: pr.Name}
+	// 	gws.Insert(k8stypes.NamespacedName{Namespace: pr.Namespace, Name: pr.Name})
+	// }
+
+	// XXX: THIS IS WRONG, JUST TO CHECK!!!
+	var protocol string
+	for _, pr := range spec.ParentRefs {
+		gw, err := t.storer.GetGateway(grpcroute.Namespace, string(pr.Name))
+		if err != nil {
+			continue // Skip when attached Gateway is not found.
+		}
+		if len(gw.Spec.Listeners) > 0 {
+			if gw.Spec.Listeners[0].Protocol == gatewayapi.HTTPSProtocolType {
+				protocol = "grpcs"
+			} else {
+				protocol = "grpc"
+			}
+			break
+		}
+	}
+
 	// each rule may represent a different set of backend services that will be accepting
 	// traffic, so we make separate routes and Kong services for every present rule.
 	for ruleNumber, rule := range spec.Rules {
@@ -68,8 +91,7 @@ func (t *Translator) ingressRulesFromGRPCRoute(result *ingressRules, grpcroute *
 			routes = subtranslator.GenerateKongRoutesFromGRPCRouteRule(grpcroute, ruleNumber)
 		}
 
-		// create a service and attach the routes to it
-		service, err := generateKongServiceFromBackendRefWithRuleNumber(t.logger, t.storer, result, grpcroute, ruleNumber, "grpcs", grpcBackendRefsToBackendRefs(rule.BackendRefs)...)
+		service, err := generateKongServiceFromBackendRefWithRuleNumber(t.logger, t.storer, result, grpcroute, ruleNumber, protocol, grpcBackendRefsToBackendRefs(rule.BackendRefs)...)
 		if err != nil {
 			return err
 		}

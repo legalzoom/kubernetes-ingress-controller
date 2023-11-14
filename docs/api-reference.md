@@ -282,6 +282,7 @@ _Appears in:_
 Package v1alpha1 contains API Schema definitions for the configuration.konghq.com v1alpha1 API group.
 
 - [IngressClassParameters](#ingressclassparameters)
+- [KongService](#kongservice)
 
 ### IngressClassParameters
 
@@ -297,6 +298,24 @@ IngressClassParameters is the Schema for the IngressClassParameters API.
 | `kind` _string_ | `IngressClassParameters`
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
 | `spec` _[IngressClassParametersSpec](#ingressclassparametersspec)_ | Spec is the IngressClassParameters specification. |
+
+
+
+
+### KongService
+
+
+
+KongService is the Schema for the kongservices API.
+
+<!-- kong_service description placeholder -->
+
+| Field | Description |
+| --- | --- |
+| `apiVersion` _string_ | `configuration.konghq.com/v1alpha1`
+| `kind` _string_ | `KongService`
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `spec` _[KongServiceSpec](#kongservicespec)_ |  |
 
 
 
@@ -317,6 +336,21 @@ IngressClassParameters is the Schema for the IngressClassParameters API.
 
 _Appears in:_
 - [IngressClassParameters](#ingressclassparameters)
+
+### KongServiceSpec
+
+
+
+
+
+
+
+
+
+_Appears in:_
+- [KongService](#kongservice)
+
+
 
 
 ## configuration.konghq.com/v1beta1

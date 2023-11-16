@@ -83,7 +83,7 @@ func (r *CoreV1SecretReconciler) shouldReconcileSecret(obj client.Object) bool {
 	}
 
 	labels := secret.Labels
-	if labels != nil && labels[CACertLabelKey] == "true" {
+	if labels != nil && (labels[CACertLabelKey] == "true" || labels["konghq.com/credential"] != "") {
 		return true
 	}
 
